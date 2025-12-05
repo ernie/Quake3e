@@ -56,13 +56,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
-#include "../renderercommon/tr_public.h"
 
 #include "linux_local.h" // bk001204
-
-#ifndef DEDICATED
-#include "../client/client.h"
-#endif
 
 unsigned sys_frame_time;
 
@@ -290,10 +285,6 @@ void NORETURN Sys_Exit( int code )
 
 void NORETURN Sys_Quit( void )
 {
-#ifndef DEDICATED
-	CL_Shutdown( "", qtrue );
-#endif
-
 	Sys_Exit( 0 );
 }
 
@@ -327,10 +318,6 @@ void NORETURN FORMAT_PRINTF(1, 2) QDECL Sys_Error( const char *format, ... )
 	va_start( argptr, format );
 	Q_vsnprintf( text, sizeof( text ), format, argptr );
 	va_end( argptr );
-
-#ifndef DEDICATED
-	CL_Shutdown( text, qtrue );
-#endif
 
 	fprintf( stderr, "Sys_Error: %s\n", text );
 
@@ -595,9 +582,6 @@ Platform-dependent event handling
 */
 void Sys_SendKeyEvents( void )
 {
-#ifndef DEDICATED
-	HandleEvents();
-#endif
 }
 
 
@@ -809,11 +793,7 @@ void Sys_PrintBinVersion( const char* name )
 	const char *sep = "==============================================================";
 
 	fprintf( stdout, "\n\n%s\n", sep );
-#ifdef DEDICATED
 	fprintf( stdout, "Linux Quake3 Dedicated Server [%s %s]\n", date, time );
-#else
-	fprintf( stdout, "Linux Quake3 Full Executable  [%s %s]\n", date, time );
-#endif
 	fprintf( stdout, " local install: %s\n", name );
 	fprintf( stdout, "%s\n\n", sep );
 }
@@ -1046,10 +1026,8 @@ int main( int argc, const char* argv[] )
 		}
 	}
 
-#ifdef DEDICATED
 	// init here for dedicated, as we don't have GLimp_Init
 	InitSig();
-#endif
 
 	while (1)
 	{
@@ -1057,15 +1035,8 @@ int main( int argc, const char* argv[] )
 		Sys_ConfigureFPU();
 #endif
 
-#ifdef DEDICATED
 		// run the game
 		Com_Frame( qfalse );
-#else
-		// check for other input devices
-		IN_Frame();
-		// run the game
-		Com_Frame( CL_NoDelay() );
-#endif
 	}
 	// never gets here
 	return 0;

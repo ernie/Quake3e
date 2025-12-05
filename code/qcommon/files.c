@@ -398,20 +398,6 @@ FS_PakIsPure
 =================
 */
 static qboolean FS_PakIsPure( const pack_t *pack ) {
-#ifndef DEDICATED
-	int i;
-	if ( fs_numServerPaks ) {
-		for ( i = 0 ; i < fs_numServerPaks ; i++ ) {
-			// FIXME: also use hashed file names
-			// NOTE TTimo: a pk3 with same checksum but different name would be validated too
-			//   I don't see this as allowing for any exploit, it would only happen if the client does manips of its file names 'not a bug'
-			if ( pack->checksum == fs_serverPaks[i] ) {
-				return qtrue;		// on the approved list
-			}
-		}
-		return qfalse;	// not on the pure server pak list
-	}
-#endif
 	return qtrue;
 }
 
@@ -949,11 +935,6 @@ int FS_SV_FOpenFileRead( const char *filename, fileHandle_t *fp ) {
 	fd = &fsh[ f ];
 	FS_InitHandle( fd );
 
-#ifndef DEDICATED
-	// don't let sound stutter
-	// S_ClearSoundBuffer();
-#endif
-
 	// search homepath
 	ospath = FS_BuildOSPath( fs_homepath->string, filename, NULL );
 
@@ -1018,11 +999,6 @@ void FS_SV_Rename( const char *from, const char *to ) {
 		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
 	}
 
-#ifndef DEDICATED
-	// don't let sound stutter
-	// S_ClearSoundBuffer();
-#endif
-
 	from_ospath = FS_BuildOSPath( fs_homepath->string, from, NULL );
 	to_ospath = FS_BuildOSPath( fs_homepath->string, to, NULL );
 
@@ -1050,11 +1026,6 @@ void FS_Rename( const char *from, const char *to ) {
 	if ( !fs_searchpaths ) {
 		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
 	}
-
-#ifndef DEDICATED
-	// don't let sound stutter
-	// S_ClearSoundBuffer();
-#endif
 
 	from_ospath = FS_BuildOSPath( fs_homepath->string, fs_gamedir, from );
 	to_ospath = FS_BuildOSPath( fs_homepath->string, fs_gamedir, to );
@@ -1286,11 +1257,6 @@ fileHandle_t FS_FOpenFileAppend( const char *filename ) {
 	if ( !*filename ) {
 		return FS_INVALID_HANDLE;
 	}
-
-#ifndef DEDICATED
-	// don't let sound stutter
-	// S_ClearSoundBuffer();
-#endif
 
 	ospath = FS_BuildOSPath( fs_homepath->string, fs_gamedir, filename );
 
@@ -5020,51 +4986,6 @@ const char *FS_LoadedPakChecksums( qboolean *overflowed ) {
 
 	return info;
 }
-
-
-/*
-=====================
-FS_LoadedPakNames
-
-Returns a space separated string containing the names of all loaded pk3 files.
-Servers with sv_pure set will get this string and pass it to clients.
-=====================
-*/
-#ifndef DEDICATED
-const char *FS_LoadedPakNames( void ) {
-	static char	info[BIG_INFO_STRING];
-	const searchpath_t *search;
-	char *s, *max;
-	int len;
-
-	s = info;
-	info[0] = '\0';
-	max = &info[sizeof(info)-1];
-
-	for ( search = fs_searchpaths ; search ; search = search->next ) {
-		// is the element a pak file?
-		if ( !search->pack )
-			continue;
-
-		if ( search->pack->exclude )
-			continue;
-
-		len = (int)strlen( search->pack->pakBasename );
-		if ( info[0] )
-			len++;
-
-		if ( s + len > max )
-			break;
-
-		if ( info[0] )
-			s = Q_stradd( s, " " );
-
-		s = Q_stradd( s, search->pack->pakBasename );
-	}
-
-	return info;
-}
-#endif
 
 
 /*

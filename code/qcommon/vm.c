@@ -215,9 +215,7 @@ static int forced_unload;
 static struct vm_s vmTable[ VM_COUNT ];
 
 static const char *vmName[ VM_COUNT ] = {
-	"qagame",
-	"cgame",
-	"ui"
+	"qagame"
 };
 
 static void VM_VmInfo_f( void );
@@ -269,10 +267,6 @@ VM_Init
 ==============
 */
 void VM_Init( void ) {
-#ifndef DEDICATED
-	Cvar_Get( "vm_ui", "2", CVAR_ARCHIVE | CVAR_PROTECTED );	// !@# SHIP WITH SET TO 2
-	Cvar_Get( "vm_cgame", "2", CVAR_ARCHIVE | CVAR_PROTECTED );	// !@# SHIP WITH SET TO 2
-#endif
 	Cvar_Get( "vm_game", "2", CVAR_ARCHIVE | CVAR_PROTECTED );	// !@# SHIP WITH SET TO 2
 
 	Cmd_AddCommand( "vmprofile", VM_VmProfile_f );
@@ -1581,69 +1575,14 @@ VM_ReplaceInstructions
 =================
 */
 void VM_ReplaceInstructions( vm_t *vm, instruction_t *buf ) {
-	instruction_t *ip;
 
 	//Com_Printf( S_COLOR_GREEN "VMINFO [%s] crc: %08X, ic: %i, dl: %i\n", vm->name, vm->crc32sum, vm->instructionCount, vm->exactDataLength );
-
-	if ( vm->index == VM_CGAME ) {
-		if ( vm->crc32sum == 0x3E93FC1A && vm->instructionCount == 123596 && vm->exactDataLength == 2007536 ) {
-			ip = buf + 110190;
-			if ( ip->op == OP_ENTER && (ip+183)->op == OP_LEAVE && ip->value == (ip+183)->value ) {
-				ip++;
-				ip->op = OP_CONST;	ip->value = 110372; ip++;
-				ip->op = OP_JUMP;	ip->value = 0; ip++;
-				ip->op = OP_IGNORE; ip->value = 0;
-			}
-			if ( buf[4358].op == OP_LOCAL && buf[4358].value == 308 && buf[4359].op == OP_CONST && !buf[4359].value ) {
-				buf[4359].value++;
-			}
-		} else
-		if ( vm->crc32sum == 0xF0F1AE90 && vm->instructionCount == 123552 && vm->exactDataLength == 2007520 ) {
-			ip = buf + 110177;
-			if ( ip->op == OP_ENTER && (ip+183)->op == OP_LEAVE && ip->value == (ip+183)->value ) {
-				ip++;
-				ip->op = OP_CONST;	ip->value = 110359; ip++;
-				ip->op = OP_JUMP;	ip->value = 0; ip++;
-				ip->op = OP_IGNORE; ip->value = 0;
-			}
-			if ( buf[4358].op == OP_LOCAL && buf[4358].value == 308 && buf[4359].op == OP_CONST && !buf[4359].value ) {
-				buf[4359].value++;
-			}
-		} else
-		if ( vm->crc32sum == 0x051D4668 && vm->instructionCount == 267812 && vm->exactDataLength == 38064376 ) {
-			ip = buf + 235;
-			if ( ip->value == 70943 ) {
-				VM_IgnoreInstructions( ip, 8 );
-			}
-		}
-	}
 
 	if ( vm->index == VM_GAME ) {
 		if ( vm->crc32sum == 0x5AAE0ACC && vm->instructionCount == 251521 && vm->exactDataLength == 1872720 ) {
 			vm->forceDataMask = qtrue; // OSP server doing some bad things with memory
 		} else {
 			vm->forceDataMask = qfalse;
-		}
-	}
-
-	if ( vm->index == VM_UI ) {
-		// fix OSP demo UI
-		if ( vm->crc32sum == 0xCA84F31D && vm->instructionCount == 78585 && vm->exactDataLength == 542180 ) {
-			if ( memcmp( vm->dataBase + 0x3D2E, "dm_67", 5 ) == 0 ) {
-				memcpy( vm->dataBase + 0x3D2E, "dm_??", 5 );
-			}
-			if ( memcmp( vm->dataBase + 0x3D50, "\"%s.%s\"\n", 8 ) == 0 ) {
-				memcpy( vm->dataBase + 0x3D50, "\"%s\"\n", 6 );
-			}
-		}
-		// fix defrag-1.91.25 demo UI - masked Q_strupr() calls for directories and filenames
-		if ( vm->crc32sum == 0x6E51985F && vm->instructionCount == 125942 && vm->exactDataLength == 1334788 ) {
-			ip = buf + 60150;
-			if ( ip[0].op == OP_LOCAL && ip[0].value == 28 && ip[1].op == OP_LOAD4 && ip[2].op == OP_ARG && ip[3].value == 124325 ) {
-				VM_IgnoreInstructions( ip, 6 );
-				ip = buf + 60438;
-				VM_IgnoreInstructions( ip, 6 );
-			}
 		}
 	}
 }
@@ -2029,10 +1968,6 @@ static vm_t *VM_NameToVM( const char *name )
 
 	if ( !Q_stricmp( name, "game" ) )
 		index = VM_GAME;
-	else if ( !Q_stricmp( name, "cgame" ) )
-		index = VM_CGAME;
-	else if ( !Q_stricmp( name, "ui" ) )
-		index = VM_UI;
 	else {
 		Com_Printf( " unknown VM name '%s'\n", name );
 		return NULL;
@@ -2060,7 +1995,7 @@ static void VM_VmProfile_f( void ) {
 	double		total;
 
 	if ( Cmd_Argc() < 2 ) {
-		Com_Printf( "usage: %s <game|cgame|ui>\n", Cmd_Argv( 0 ) );
+		Com_Printf( "usage: %s <game>\n", Cmd_Argv( 0 ) );
 		return;
 	}
 

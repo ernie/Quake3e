@@ -20,7 +20,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 // win_syscon.h
-#include "../client/client.h"
 #include "win_local.h"
 #include "resource.h"
 
@@ -141,19 +140,6 @@ static int GetTimerMsec( void )
 	} else {
 		msec = 1000 / Cvar_VariableIntegerValue( "sv_fps" );
 	}
-#ifndef DEDICATED
-	if ( com_cl_running && com_cl_running->integer ) {
-		if ( com_maxfps->integer ) {
-			msec = 1000 / com_maxfps->integer;
-		}
-		if ( Cvar_VariableIntegerValue( "com_maxfpsUnfocused" ) ) {
-			msec = 1000 / Cvar_VariableIntegerValue( "com_maxfpsUnfocused" );
-		}
-		if ( gw_minimized || CL_VideoRecording() ) {
-			return 0;
-		}
-	}
-#endif
 	return msec;
 }
 
@@ -358,11 +344,7 @@ static LRESULT WINAPI ConWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lP
 		}
 		else if ( wParam == CON_TIMER_ID && conTimerID != 0 && !com_errorEntered )
 		{
-#ifdef DEDICATED
 			Com_Frame( qfalse );
-#else
-			//Com_Frame( CL_NoDelay() );
-#endif
 		}
 		break;
 
@@ -449,11 +431,7 @@ static LRESULT WINAPI BufferWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
 	case WM_TIMER:
 		if ( wParam == BUF_TIMER_ID && bufTimerID != 0 && !com_errorEntered )
 		{
-#ifdef DEDICATED
 			Com_Frame( qfalse );
-#else
-			//Com_Frame( CL_NoDelay() );
-#endif
 		}
 		if ( wParam == TEX_TIMER_ID && texTimerID != 0 ) {
 			if ( conBufPos ) {
@@ -757,14 +735,12 @@ void Sys_CreateConsole( const char *title, int xPos, int yPos, qboolean useXYpos
 	s_wcd.windowWidth = rect.right - rect.left + 1;
 	s_wcd.windowHeight = rect.bottom - rect.top + 1;
 
-#ifdef DEDICATED
 	if ( useXYpos )
 	{
 		con_x = xPos;
 		con_y = yPos;
 	}
 	else
-#endif
 	{
 		con_x = x + ( w - s_wcd.windowWidth ) / 2;
 		con_y = y + ( h - s_wcd.windowHeight ) / 2;

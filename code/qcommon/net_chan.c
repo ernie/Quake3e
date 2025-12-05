@@ -501,72 +501,6 @@ qboolean Netchan_Process( netchan_t *chan, msg_t *msg ) {
 //==============================================================================
 
 
-/*
-=============================================================================
-
-LOOPBACK BUFFERS FOR LOCAL PLAYER
-
-=============================================================================
-*/
-#ifndef DEDICATED
-
-// there needs to be enough loopback messages to hold a complete
-// gamestate of maximum size
-#define	MAX_LOOPBACK	32
-
-typedef struct {
-	byte	data[MAX_PACKETLEN];
-	int		datalen;
-} loopmsg_t;
-
-typedef struct {
-	loopmsg_t	msgs[MAX_LOOPBACK];
-	int			get, send;
-} loopback_t;
-
-static loopback_t loopbacks[2]; // NS_CLIENT, NS_SERVER
-
-
-qboolean NET_GetLoopPacket( netsrc_t sock, netadr_t *net_from, msg_t *net_message )
-{
-	int		i;
-	loopback_t	*loop;
-
-	loop = &loopbacks[sock];
-
-	if ( loop->send - loop->get > MAX_LOOPBACK )
-		loop->get = loop->send - MAX_LOOPBACK;
-
-	if ( loop->send - loop->get <= 0 )
-		return qfalse;
-
-	i = loop->get & (MAX_LOOPBACK-1);
-	loop->get++;
-
-	Com_Memcpy (net_message->data, loop->msgs[i].data, loop->msgs[i].datalen);
-	net_message->cursize = loop->msgs[i].datalen;
-	Com_Memset (net_from, 0, sizeof(*net_from));
-	net_from->type = NA_LOOPBACK;
-	return qtrue;
-}
-
-
-static void NET_SendLoopPacket( netsrc_t sock, int length, const void *data )
-{
-	int		i;
-	loopback_t	*loop;
-
-	loop = &loopbacks[sock^1];
-
-	i = loop->send & (MAX_LOOPBACK-1);
-	loop->send++;
-
-	Com_Memcpy (loop->msgs[i].data, data, length);
-	loop->msgs[i].datalen = length;
-}
-
-#endif // !DEDICATED
-
 //=============================================================================
 
 typedef struct packetQueue_s {
@@ -624,12 +558,7 @@ static packetQueue_t *list_process( packetQueue_t *head, const int time_diff )
 		now = Sys_Milliseconds();
 		if ( now - item->release >= time_diff ) {
 			packetQueue_t *next = item->next;
-#ifndef DEDICATED
-			if ( item->to.type == NA_LOOPBACK )
-				NET_SendLoopPacket( item->sock, item->length, item->data );
-			else
-#endif
-				Sys_SendPacket( item->length, item->data, &item->to );
+			Sys_SendPacket( item->length, item->data, &item->to );
 			head = list_remove( head, item );
 			Z_Free( item );
 			item = next;
@@ -692,19 +621,9 @@ void NET_SendPacket( netsrc_t sock, int length, const void *data, const netadr_t
 	if ( to->type == NA_BAD ) {
 		return;
 	}
-#ifndef DEDICATED
-	if ( sock == NS_CLIENT && cl_packetdelay->integer > 0 ) {
-		NET_QueuePacket( sock, length, data, to, cl_packetdelay->integer );
-	} else
-#endif
 	if ( sock == NS_SERVER && sv_packetdelay->integer > 0 ) {
 		NET_QueuePacket( sock, length, data, to, sv_packetdelay->integer );
 	}
-#ifndef DEDICATED
-	else if ( to->type == NA_LOOPBACK ) {
-		NET_SendLoopPacket( sock, length, data );
-	}
-#endif
 	else {
 		Sys_SendPacket( length, data, to );
 	}

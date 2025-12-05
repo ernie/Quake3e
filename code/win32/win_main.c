@@ -23,9 +23,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
-#ifndef DEDICATED
-#include "../client/client.h"
-#endif
 #include "win_local.h"
 #include "resource.h"
 #include <sys/types.h>
@@ -38,42 +35,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define MEM_THRESHOLD (96*1024*1024)
 
 WinVars_t	g_wv;
-
-#ifndef DEDICATED
-
-/*
-==================
-Sys_LowPhysicalMemory
-==================
-*/
-qboolean Sys_LowPhysicalMemory( void ) {
-#if	_MSC_VER < 1600 // MSVC 2008 and lower, assume win9x compatibility builds
-	MEMORYSTATUS stat;
-	GlobalMemoryStatus( &stat );
-	return (stat.dwTotalPhys <= MEM_THRESHOLD) ? qtrue : qfalse;
-#else
-	MEMORYSTATUSEX stat;
-	stat.dwLength = sizeof(stat);
-
-	if ( !GlobalMemoryStatusEx( &stat ) ) {
-		return qfalse;
-	}
-
-	return (stat.ullAvailPhys <= MEM_THRESHOLD) ? qtrue : qfalse;
-#endif
-}
-
-
-/*
-==================
-Sys_BeginProfiling
-==================
-*/
-void Sys_BeginProfiling( void ) {
-	// this is just used on the mac build
-}
-
-#endif // !DEDICATED
 
 /*
 =============
@@ -90,10 +51,6 @@ void NORETURN FORMAT_PRINTF(1, 2) QDECL Sys_Error( const char *error, ... ) {
 	va_start( argptr, error );
 	Q_vsnprintf( text, sizeof( text ), error, argptr );
 	va_end( argptr );
-
-#ifndef DEDICATED
-	CL_Shutdown( text, qtrue );
-#endif
 
 	Conbuf_AppendText( text );
 	Conbuf_AppendText( "\n" );
@@ -566,11 +523,6 @@ Platform-dependent event handling
 */
 void Sys_SendKeyEvents( void )
 {
-#ifndef DEDICATED
-	if ( !com_dedicated->integer )
-		HandleEvents();
-	else
-#endif
 	HandleConsoleEvents();
 }
 
@@ -707,18 +659,6 @@ Restore gamma and hide fullscreen window in case of crash
 */
 static LONG WINAPI ExceptionFilter( struct _EXCEPTION_POINTERS *ExceptionInfo )
 {
-#ifndef DEDICATED
-	if ( com_dedicated->integer == 0 ) {
-		extern cvar_t *com_cl_running;
-		if ( com_cl_running  && com_cl_running->integer ) {
-			// assume we can restart client module
-		} else {
-			GLW_RestoreGamma();
-			GLW_HideFullscreenWindow();
-		}
-	}
-#endif
-
 	if ( ExceptionInfo->ExceptionRecord->ExceptionCode != EXCEPTION_BREAKPOINT )
 	{
 		char msg[128], name[MAX_OSPATH];
@@ -829,15 +769,8 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 		// _controlfp( _PC_24, _MCW_PC );
 		// _controlfp( -1, _MCW_EM  ); // no exceptions, even if some crappy syscall turns them back on!
 
-#ifdef DEDICATED
 		// run the game
 		Com_Frame( qfalse );
-#else
-		// make sure mouse and joystick are only called once a frame
-		IN_Frame();
-		// run the game
-		Com_Frame( CL_NoDelay() );
-#endif
 	}
 
 	// never gets here

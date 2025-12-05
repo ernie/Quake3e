@@ -423,15 +423,6 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 
 	Sys_SetStatus( "Initializing server..." );
 
-#ifndef DEDICATED
-	// if not running a dedicated server CL_MapLoading will connect the client to the server
-	// also print some status stuff
-	CL_MapLoading();
-
-	// make sure all the client stuff is unloaded
-	CL_ShutdownAll();
-#endif
-
 	// clear the whole hunk because we're (re)loading the server
 	Hunk_Clear();
 
@@ -453,12 +444,6 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 			SV_ChangeMaxClients();
 		}
 	}
-
-#ifndef DEDICATED
-	// remove pure paks that may left from client-side
-	FS_PureServerSetLoadedPaks( "", "" );
-	FS_PureServerSetReferencedPaks( "", "" );
-#endif
 
 	// clear pak references
 	FS_ClearPakReferences( 0 );
@@ -507,11 +492,6 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	for ( i = 0; i < MAX_CONFIGSTRINGS; i++ ) {
 		sv.configstrings[i] = CopyString("");
 	}
-
-	// make sure we are not paused
-#ifndef DEDICATED
-	Cvar_Set( "cl_paused", "0" );
-#endif
 
 	// get latched value
 	sv_pure = Cvar_Get( "sv_pure", "1", CVAR_SYSTEMINFO | CVAR_LATCH );
@@ -779,7 +759,10 @@ void SV_Init( void )
 	//sv_master[1] = Cvar_Get( "sv_master2", "master.ioquake3.org", CVAR_INIT | CVAR_ARCHIVE_ND );
 	//sv_master[2] = Cvar_Get( "sv_master3", "master.maverickservers.com", CVAR_INIT | CVAR_ARCHIVE_ND );
 
-	for ( index = 0; index < MAX_MASTER_SERVERS; index++ )
+	sv_master[0] = Cvar_Get( "sv_master1", MASTER_SERVER_NAME, CVAR_ARCHIVE_ND );
+	sv_master[1] = Cvar_Get( "sv_master2", "master.ioquake3.org", CVAR_ARCHIVE_ND );
+	sv_master[2] = Cvar_Get( "sv_master3", "master.maverickservers.com", CVAR_ARCHIVE_ND );
+	for ( index = 3; index < MAX_MASTER_SERVERS; index++ )
 		sv_master[ index ] = Cvar_Get( va( "sv_master%d", index + 1 ), "", CVAR_ARCHIVE_ND );
 
 	sv_reconnectlimit = Cvar_Get( "sv_reconnectlimit", "3", 0 );
@@ -915,17 +898,7 @@ void SV_Shutdown( const char *finalmsg ) {
 	// allow setting timescale 0 for demo playback
 	Cvar_CheckRange( com_timescale, "0", NULL, CV_FLOAT );
 
-#ifndef DEDICATED
-	Cvar_Set( "ui_singlePlayerActive", "0" );
-#endif
-
 	Com_Printf( "---------------------------\n" );
-
-#ifndef DEDICATED
-	// disconnect any local clients
-	if ( sv_killserver->integer != 2 )
-		CL_Disconnect( qfalse );
-#endif
 
 	// clean some server cvars
 	Cvar_Set( "sv_referencedPaks", "" );

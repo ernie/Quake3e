@@ -1587,14 +1587,8 @@ NET_GetCvars
 static qboolean NET_GetCvars( void ) {
 	int modified;
 
-#if defined (DEDICATED) || !defined (USE_IPV6)
 	// I want server owners to explicitly turn on ipv6 support.
 	net_enabled = Cvar_Get( "net_enabled", "1", CVAR_LATCH | CVAR_ARCHIVE_ND | CVAR_NORESTART );
-#else
-	/* End users have it enabled so they can connect to ipv6-only hosts, but ipv4 will be
-	 * used if available due to ping */
-	net_enabled = Cvar_Get( "net_enabled", "3", CVAR_LATCH | CVAR_ARCHIVE_ND | CVAR_NORESTART );
-#endif
 
 	Cvar_SetDescription( net_enabled, "Networking options, bitmask:\n"
 		" 1 - enable IPv4\n"
@@ -1835,14 +1829,7 @@ static void NET_Event( const fd_set *fdr )
 					continue; // drop this packet
 			}
 
-#ifdef DEDICATED
 			Com_RunAndTimeServerPacket( &from, &netmsg );
-#else
-			if ( com_sv_running->integer || com_dedicated->integer )
-				Com_RunAndTimeServerPacket( &from, &netmsg );
-			else
-				CL_PacketEvent( &from, &netmsg );
-#endif
 		}
 		else
 			break;

@@ -136,21 +136,6 @@ typedef struct
 
 	// Multi-monitor tracking
 	RECT			conRect;
-#ifndef DEDICATED
-	RECT			winRect;
-	qboolean		winRectValid;
-
-	int				borderless;
-
-	// when we get a windows message, we store the time off so keyboard processing
-	// can know the exact time of an event
-	unsigned		sysMsgTime;
-
-	int raw_mx;
-	int raw_my;
-
-	POINT mouse;
-#endif
 } WinVars_t;
 
 extern WinVars_t	g_wv;

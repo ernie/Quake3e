@@ -659,13 +659,6 @@ static void SVC_Status( const netadr_t *from ) {
 	int		playerLength;
 	char	infostring[MAX_INFO_STRING+160]; // add some space for challenge string
 
-	// ignore if we are in single player
-#ifndef DEDICATED
-	if ( Cvar_VariableIntegerValue( "g_gametype" ) == GT_SINGLE_PLAYER || Cvar_VariableIntegerValue("ui_singlePlayerActive")) {
-		return;
-	}
-#endif
-
 	// Prevent using getstatus as an amplifier
 	if ( SVC_RateLimitAddress( from, 10, 1000 ) ) {
 		if ( com_developer->integer ) {
@@ -701,8 +694,8 @@ static void SVC_Status( const netadr_t *from ) {
 		if ( cl->state >= CS_CONNECTED ) {
 
 			ps = SV_GameClientNum( i );
-			playerLength = Com_sprintf( player, sizeof( player ), "%i %i \"%s\"\n", 
-				ps->persistant[ PERS_SCORE ], cl->ping, cl->name );
+			playerLength = Com_sprintf( player, sizeof( player ), "%i %i %i \"%s\" %i\n",
+				ps->persistant[ PERS_SCORE ], cl->ping, ps->persistant[ PERS_TEAM ], cl->name, i );
 			
 			if ( statusLength + playerLength >= MAX_PACKETLEN-4 )
 				break; // can't hold any more
@@ -728,13 +721,6 @@ static void SVC_Info( const netadr_t *from ) {
 	int		i, count, humans;
 	const char	*gamedir;
 	char	infostring[MAX_INFO_STRING];
-
-	// ignore if we are in single player
-#ifndef DEDICATED
-	if ( Cvar_VariableIntegerValue( "g_gametype" ) == GT_SINGLE_PLAYER || Cvar_VariableIntegerValue("ui_singlePlayerActive")) {
-		return;
-	}
-#endif
 
 	// Prevent using getinfo as an amplifier
 	if ( SVC_RateLimitAddress( from, 10, 1000 ) ) {
@@ -1147,39 +1133,8 @@ SV_CheckPaused
 ==================
 */
 static qboolean SV_CheckPaused( void ) {
-
-#ifdef DEDICATED
 	// can't pause on dedicated servers
 	return qfalse;
-#else
-	const client_t *cl;
-	int	count;
-	int	i;
-
-	if ( !cl_paused->integer ) {
-		return qfalse;
-	}
-
-	// only pause if there is just a single client connected
-	count = 0;
-	for ( i = 0, cl = svs.clients ; i < sv.maxclients; i++, cl++ ) {
-		if ( cl->state >= CS_CONNECTED && cl->netchan.remoteAddress.type != NA_BOT ) {
-			count++;
-		}
-	}
-
-	if ( count > 1 ) {
-		// don't pause
-		if (sv_paused->integer)
-			Cvar_Set("sv_paused", "0");
-		return qfalse;
-	}
-
-	if (!sv_paused->integer)
-		Cvar_Set("sv_paused", "1");
-
-	return qtrue;
-#endif // !DEDICATED
 }
 
 

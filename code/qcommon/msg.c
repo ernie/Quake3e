@@ -515,12 +515,7 @@ int MSG_HashKey(const char *string, int maxlen) {
 	return hash;
 }
 
-#ifndef DEDICATED
-extern cvar_t *cl_shownet;
-#define	LOG(x) if( cl_shownet && cl_shownet->integer == 4 ) { Com_Printf("%s ", x ); };
-#else
 #define	LOG(x)
-#endif
 
 /*
 =============================================================================
@@ -884,13 +879,8 @@ void MSG_ReadDeltaEntity( msg_t *msg, const entityState_t *from, entityState_t *
 
 	// check for a remove
 	if ( MSG_ReadBits( msg, 1 ) == 1 ) {
-		Com_Memset( to, 0, sizeof( *to ) );	
+		Com_Memset( to, 0, sizeof( *to ) );
 		to->number = MAX_GENTITIES - 1;
-#ifndef DEDICATED
-		if ( cl_shownet && ( cl_shownet->integer >= 2 || cl_shownet->integer == -1 ) ) {
-			Com_Printf( "%3i: #%-3i remove\n", msg->readcount, number );
-		}
-#endif
 		return;
 	}
 
@@ -910,18 +900,7 @@ void MSG_ReadDeltaEntity( msg_t *msg, const entityState_t *from, entityState_t *
 
 	to->number = number;
 
-#ifndef DEDICATED
-	// shownet 2/3 will interleave with other printed info, -1 will
-	// just print the delta records
-	if ( cl_shownet && ( cl_shownet->integer >= 2 || cl_shownet->integer == -1 ) ) {
-		print = 1;
-		Com_Printf( "%3i: #%-3i ", msg->readcount, to->number );
-	} else {
-		print = 0;
-	}
-#else
-		print = 0;
-#endif
+	print = 0;
 
 	for ( i = 0, field = entityStateFields ; i < lc ; i++, field++ ) {
 		fromF = (const int *)( (const byte *)from + field->offset );
@@ -1226,18 +1205,7 @@ void MSG_ReadDeltaPlayerstate( msg_t *msg, const playerState_t *from, playerStat
 		startBit = ( msg->readcount - 1 ) * 8 + msg->bit - GENTITYNUM_BITS;
 	}
 
-#ifndef DEDICATED	
-	// shownet 2/3 will interleave with other printed info, -2 will
-	// just print the delta records
-	if ( cl_shownet && ( cl_shownet->integer >= 2 || cl_shownet->integer == -2 ) ) {
-		print = 1;
-		Com_Printf( "%3i: playerstate ", msg->readcount );
-	} else {
-		print = 0;
-	}
-#else
-		print = 0;
-#endif
+	print = 0;
 
 	numFields = ARRAY_LEN( playerStateFields );
 	lc = MSG_ReadByte(msg);

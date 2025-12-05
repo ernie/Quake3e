@@ -208,9 +208,6 @@ qboolean	NET_IsLocalAddress( const netadr_t *adr );
 const char	*NET_AdrToString( const netadr_t *a );
 const char	*NET_AdrToStringwPort( const netadr_t *a );
 int         NET_StringToAdr( const char *s, netadr_t *a, netadrtype_t family );
-#ifndef DEDICATED
-qboolean	NET_GetLoopPacket( netsrc_t sock, netadr_t *net_from, msg_t *net_message );
-#endif
 #ifdef USE_IPV6
 void		NET_JoinMulticast6( void );
 void		NET_LeaveMulticast6( void );
@@ -383,10 +380,6 @@ typedef enum {
 typedef enum {
 	VM_BAD = -1,
 	VM_GAME = 0,
-#ifndef USE_DEDICATED
-	VM_CGAME,
-	VM_UI,
-#endif
 	VM_COUNT
 } vmIndex_t;
 
@@ -694,13 +687,8 @@ typedef enum {
 
 #define	MAX_FOUND_FILES		0x5000
 
-#ifdef DEDICATED
 #define Q3CONFIG_CFG "q3config_server.cfg"
 #define CONSOLE_HISTORY_FILE "q3history_server"
-#else
-#define Q3CONFIG_CFG "q3config.cfg"
-#define CONSOLE_HISTORY_FILE "q3history"
-#endif
 
 typedef	time_t fileTime_t;
 #if defined  (_MSC_VER) && defined (__clang__)
@@ -1029,13 +1017,6 @@ extern	cvar_t	*sv_paused;
 extern	cvar_t	*sv_packetdelay;
 extern	cvar_t	*com_sv_running;
 
-#ifndef DEDICATED
-extern	cvar_t	*cl_paused;
-extern	cvar_t	*cl_packetdelay;
-extern	cvar_t	*com_cl_running;
-extern	cvar_t	*com_yieldCPU;
-#endif
-
 extern	cvar_t	*vm_rtChecks;
 #ifdef USE_AFFINITY_MASK
 extern	cvar_t	*com_affinityMask;
@@ -1047,11 +1028,6 @@ extern	int		time_frontend;
 extern	int		time_backend;		// renderer backend time
 
 extern	int		com_frameTime;
-
-#ifndef DEDICATED
-extern	qboolean	gw_minimized;
-extern	qboolean	gw_active;
-#endif
 
 extern	qboolean	com_errorEntered;
 

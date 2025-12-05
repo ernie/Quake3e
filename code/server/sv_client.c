@@ -119,13 +119,6 @@ void SV_GetChallenge( const netadr_t *from ) {
 	int		challenge;
 	int		clientChallenge;
 
-	// ignore if we are in single player
-#ifndef DEDICATED
-	if ( Cvar_VariableIntegerValue( "g_gametype" ) == GT_SINGLE_PLAYER || Cvar_VariableIntegerValue("ui_singlePlayerActive")) {
-		return;
-	}
-#endif
-
 	// Prevent using getchallenge as an amplifier
 	if ( SVC_RateLimitAddress( from, 10, 1000 ) ) {
 		if ( com_developer->integer ) {
@@ -2036,11 +2029,7 @@ qboolean SV_ExecuteClientCommand( client_t *cl, const char *s ) {
 	//	return qtrue;
 	// }
 
-#ifndef DEDICATED
-	if ( !com_cl_running->integer && bFloodProtect && SV_FloodProtect( cl ) ) {
-#else
 	if ( bFloodProtect && SV_FloodProtect( cl ) ) {
-#endif
 		// ignore any other text messages from this client but let them keep playing
 		Com_DPrintf( "client text ignored for %s: %s\n", cl->name, Cmd_Argv(0) );
 	} else {

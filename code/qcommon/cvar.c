@@ -1720,21 +1720,13 @@ static void Cvar_Trim_f( void )
 		}
 	}
 
-#ifdef DEDICATED
 	if ( ( com_sv_running && com_sv_running->integer ) || forced )
-#else
-	if ( ( com_cl_running && com_cl_running->integer && com_sv_running && com_sv_running->integer ) || forced )
-#endif
 	{
 		Cvar_Trim( verbose );
 		return;
 	}
 
-#ifdef DEDICATED	
 	Com_Printf( S_COLOR_YELLOW " You're not running a server, so not all subsystems/VMs are loaded.\n" );
-#else
-	Com_Printf( S_COLOR_YELLOW " You're not running a listen server, so not all subsystems/VMs are loaded.\n" );
-#endif
 	Com_Printf( S_COLOR_YELLOW " This means you'd remove cvars that are probably best kept around.\n" );
 	Com_Printf( S_COLOR_YELLOW " If you don't care, you can force the call by running '\\%s -f'.\n", Cmd_Argv(0) );
 	Com_Printf( S_COLOR_YELLOW " You've been warned.\n" );
