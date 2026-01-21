@@ -281,6 +281,9 @@ extern	serverStatic_t	svs;				// persistant server info across maps
 extern	server_t		sv;					// cleared each map
 extern	vm_t			*gvm;				// game virtual machine
 
+extern	qboolean		sv_serverStarting;		// True until first GAME_INIT completes
+extern	qboolean		sv_gameServerEvents;	// True if game supports server event logging
+
 extern	cvar_t	*sv_fps;
 extern	cvar_t	*sv_timeout;
 extern	cvar_t	*sv_zombietime;

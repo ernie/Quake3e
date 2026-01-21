@@ -22,6 +22,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "server.h"
 
+qboolean sv_serverStarting = qtrue;		// True until first GAME_INIT completes
+qboolean sv_gameServerEvents = qfalse;	// True if game supports server event logging
 
 /*
 ===============
@@ -681,6 +683,10 @@ void SV_Init( void )
 {
 	int index;
 
+	// Reset server event flags at startup
+	sv_serverStarting = qtrue;
+	sv_gameServerEvents = qfalse;
+
 	SV_AddOperatorCommands();
 
 	if ( com_dedicated->integer )
@@ -873,7 +879,16 @@ void SV_Shutdown( const char *finalmsg ) {
 
 	SV_RemoveOperatorCommands();
 	SV_MasterShutdown();
+
+	// Notify game of server shutdown before normal shutdown
+	if ( gvm && sv_gameServerEvents ) {
+		VM_Call( gvm, 0, GAME_SERVER_STOPPING );
+	}
 	SV_ShutdownGameProgs();
+
+	// Reset server startup flag so next map load triggers a new startup event
+	sv_serverStarting = qtrue;
+	sv_gameServerEvents = qfalse;
 	SV_InitChallenger();
 
 	// free current level
