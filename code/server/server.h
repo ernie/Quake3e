@@ -229,6 +229,9 @@ typedef struct client_s {
 	char			tld[3]; // "XX\0"
 	const char		*country;
 
+	// VR support
+	qboolean		isVR;				// Client is VR (from userinfo)
+
 } client_t;
 
 //=============================================================================
