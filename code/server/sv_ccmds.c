@@ -1582,6 +1582,8 @@ void SV_AddOperatorCommands( void ) {
 #endif
 	Cmd_AddCommand( "filter", SV_AddFilter_f );
 	Cmd_AddCommand( "filtercmd", SV_AddFilterCmd_f );
+	Cmd_AddCommand( "mvdrecord", SV_MVD_StartRecord_f );
+	Cmd_AddCommand( "mvdstop", SV_MVD_StopRecord_f );
 }
 
 

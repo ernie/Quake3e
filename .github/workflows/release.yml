@@ -1,0 +1,80 @@
+name: release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-linux:
+    name: Build Linux ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+
+          - arch: arm64
+            runner: ubuntu-22.04-arm
+
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get -qq update
+        sudo apt-get -y install make gcc g++ libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev libsdl2-dev
+
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Build
+      run: make install -j$(nproc) ARCH=${{ matrix.arch }} DESTDIR=bin
+
+    - name: Create archive
+      run: |
+        VERSION="${GITHUB_REF_NAME}"
+        tar czf trinity-${VERSION}-linux-${{ matrix.arch }}.tar.gz -C bin .
+
+    - name: Upload release asset
+      uses: svenstaro/upload-release-action@latest
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        tag: ${{ github.ref }}
+        overwrite: true
+        file: trinity-*-linux-${{ matrix.arch }}.tar.gz
+        file_glob: true
+
+  build-linux-armv7:
+    name: Build Linux armv7
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Build armv7
+      uses: uraimo/run-on-arch-action@v3
+      with:
+        arch: armv7
+        distro: ubuntu24.04
+        githubToken: ${{ github.token }}
+        shell: /bin/sh
+        run: |
+          apt-get -qq update
+          apt-get install -y make gcc g++ libcurl4-openssl-dev mesa-common-dev libxxf86dga-dev libxrandr-dev libxxf86vm-dev libasound-dev
+          make install -j$(nproc) ARCH=arm DESTDIR=bin USE_SDL=0
+
+    - name: Create archive
+      run: |
+        VERSION="${GITHUB_REF_NAME}"
+        tar czf trinity-${VERSION}-linux-armv7.tar.gz -C bin .
+
+    - name: Upload release asset
+      uses: svenstaro/upload-release-action@latest
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        tag: ${{ github.ref }}
+        overwrite: true
+        file: trinity-*-linux-armv7.tar.gz
+        file_glob: true

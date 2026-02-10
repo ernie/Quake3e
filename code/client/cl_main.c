@@ -860,6 +860,32 @@ static void CL_PlayDemo_f( void ) {
 	// open the demo file
 	arg = Cmd_Argv( 1 );
 
+	// Check for .mvd extension
+	ext_test = strrchr( arg, '.' );
+	if ( ext_test && !Q_stricmp( ext_test, ".mvd" ) ) {
+		Com_sprintf( name, sizeof( name ), "demos/%s", arg );
+
+		Cvar_Set( "sv_killserver", "2" );
+		CL_Disconnect( qtrue );
+
+		clc.demoplaying = qtrue;
+		Con_Close();
+
+		if ( !CL_MVD_Open( name ) ) {
+			Com_Printf( S_COLOR_YELLOW "couldn't open MVD %s\n", name );
+			clc.demoplaying = qfalse;
+			return;
+		}
+
+		Q_strncpyz( clc.demoName, arg, sizeof( clc.demoName ) );
+		Q_strncpyz( cls.servername, arg, sizeof( cls.servername ) );
+		cls.state = CA_CONNECTED;
+		clc.firstDemoFrameSkipped = qfalse;
+
+		CL_InitDownloads();
+		return;
+	}
+
 	// check for an extension .DEMOEXT_?? (?? is protocol)
 	ext_test = strrchr(arg, '.');
 	if ( ext_test && !Q_stricmpn(ext_test + 1, DEMOEXT, ARRAY_LEN(DEMOEXT) - 1) )
@@ -1214,6 +1240,11 @@ qboolean CL_Disconnect( qboolean showMainMenu ) {
 	// Stop demo recording
 	if ( clc.demorecording ) {
 		CL_StopRecord_f();
+	}
+
+	// Stop MVD playback
+	if ( mvdPlay.active ) {
+		CL_MVD_Close();
 	}
 
 	// Stop demo playback
@@ -4038,6 +4069,8 @@ void CL_Init( void ) {
 	Cmd_AddCommand( "dlmap", CL_Download_f );
 #endif
 	Cmd_AddCommand( "modelist", CL_ModeList_f );
+
+	CL_MVD_Init();
 
 	Cvar_Set( "cl_running", "1" );
 #ifdef USE_MD5

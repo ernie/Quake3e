@@ -145,6 +145,72 @@ typedef struct {
 
 extern	clientActive_t		cl;
 
+// MVD playback state
+#define MAX_MVD_KEYFRAMES	8192
+#define MAX_MVD_MSGLEN		(256*1024)
+
+typedef struct {
+	int				serverTime;
+	unsigned int	fileOffset;
+	unsigned int	fileOffsetHi;
+} mvdKeyframe_t;
+
+typedef struct {
+	qboolean		active;
+	fileHandle_t	file;
+
+	// Header
+	int				svFps;
+	int				maxclients;
+
+	// Running state buffers
+	entityState_t	entities[MAX_GENTITIES];
+	byte			entityBitmask[MAX_GENTITIES/8];
+	playerState_t	players[MAX_CLIENTS];
+	byte			playerBitmask[MAX_CLIENTS/8];
+
+	// Frame tracking
+	int				serverTime;
+
+	// Double-buffered snapshots for cgame interpolation
+	clSnapshot_t	snapshots[2];
+	int				snapCount;
+
+	// Entities for the two snapshots
+	entityState_t	snapEntities[2][MAX_ENTITIES_IN_SNAPSHOT];
+
+	// Viewpoint
+	int				viewpoint;
+	vec3_t			viewOrigin;		// updated by cgame via respatialize trap
+
+	// Server commands for cgame delivery
+	int				cmdSequence;
+	char			cmds[MAX_RELIABLE_COMMANDS][MAX_STRING_CHARS];
+
+	// Keyframe index
+	mvdKeyframe_t	*keyframes;
+	int				keyframeCount;
+
+	// Read buffer
+	byte			msgBuf[MAX_MVD_MSGLEN];
+
+	// Duration info
+	int				firstServerTime;
+	int				lastServerTime;
+
+	// EOF tracking
+	qboolean		atEnd;
+
+	// Seek state
+	qboolean		seeking;
+
+	// Saved initial state for seeking (configstrings are delta-encoded from header)
+	long			firstFrameOffset;
+	gameState_t		initialGameState;
+} mvdPlayback_t;
+
+extern mvdPlayback_t mvdPlay;
+
 #define EM_GAMESTATE 1
 #define EM_SNAPSHOT  2
 #define EM_COMMAND   4
@@ -600,6 +666,23 @@ size_t	CL_SaveJPGToBuffer( byte *buffer, size_t bufSize, int quality, int image_
 void	CL_SaveJPG( const char *filename, int quality, int image_width, int image_height, byte *image_buffer, int padding );
 void	CL_LoadJPG( const char *filename, unsigned char **pic, int *width, int *height );
 
+
+//
+// cl_mvd.c
+//
+extern cvar_t *cl_mvdViewpoint;
+extern cvar_t *cl_mvdTime;
+extern cvar_t *cl_mvdDuration;
+
+void CL_MVD_Init( void );
+qboolean CL_MVD_Open( const char *filename );
+void CL_MVD_Close( void );
+void CL_MVD_ReadFrame( void );
+void CL_MVD_BuildSnapshot( int which );
+void CL_MVD_Seek( int targetTime );
+qboolean CL_MVD_GetSnapshot( int snapshotNumber, snapshot_t *snapshot );
+void CL_MVD_GetCurrentSnapshotNumber( int *snapshotNumber, int *serverTime );
+qboolean CL_MVD_GetServerCommand( int serverCommandNumber );
 
 // base backend functions
 void	HandleEvents( void );

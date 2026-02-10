@@ -22,6 +22,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "server.h"
 
+qboolean sv_serverStarting = qtrue;		// True until first GAME_INIT completes
+qboolean sv_gameServerEvents = qfalse;	// True if game supports server event logging
 
 /*
 ===============
@@ -123,6 +125,11 @@ void SV_SetConfigstring (int index, const char *val) {
 	// change the string in sv
 	Z_Free( sv.configstrings[index] );
 	sv.configstrings[index] = CopyString( val );
+
+	// MVD recording hook
+	if ( mvd.recording ) {
+		SV_MVD_ConfigstringChanged( index );
+	}
 
 	// send it to all the clients if we aren't
 	// spawning a new server
@@ -311,6 +318,9 @@ static void SV_Startup( void ) {
 
 	Cvar_Set( "sv_running", "1" );
 
+	// Advertise VR support to clients
+	Cvar_Get( "vr_support", "1", CVAR_SERVERINFO | CVAR_ROM );
+
 	// Join the ipv6 multicast group now that a map is running so clients can scan for us on the local network.
 #ifdef USE_IPV6
 	NET_JoinMulticast6();
@@ -414,6 +424,9 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	int			checksum;
 	qboolean	isBot;
 	const char	*p;
+
+	// Stop any active MVD recording before map change
+	SV_MVD_StopRecord();
 
 	// shut down the existing game if it is running
 	SV_ShutdownGameProgs();
@@ -685,6 +698,9 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 
 	Sys_SetStatus( "Running map %s", mapname );
 
+	// Auto-start MVD recording if enabled
+	SV_MVD_AutoStart();
+
 	// suppress hitch warning
 	Com_FrameInit();
 }
@@ -701,7 +717,13 @@ void SV_Init( void )
 {
 	int index;
 
+	// Reset server event flags at startup
+	sv_serverStarting = qtrue;
+	sv_gameServerEvents = qfalse;
+
 	SV_AddOperatorCommands();
+
+	SV_MVD_Init();
 
 	if ( com_dedicated->integer )
 		SV_AddDedicatedCommands();
@@ -774,12 +796,10 @@ void SV_Init( void )
 	Cvar_SetDescription( sv_allowDownload, "Toggle the ability for clients to download files maps etc. from server." );
 	Cvar_Get ("sv_dlURL", "", CVAR_SERVERINFO | CVAR_ARCHIVE);
 
-	// moved to Com_Init()
-	//sv_master[0] = Cvar_Get( "sv_master1", MASTER_SERVER_NAME, CVAR_INIT | CVAR_ARCHIVE_ND );
-	//sv_master[1] = Cvar_Get( "sv_master2", "master.ioquake3.org", CVAR_INIT | CVAR_ARCHIVE_ND );
-	//sv_master[2] = Cvar_Get( "sv_master3", "master.maverickservers.com", CVAR_INIT | CVAR_ARCHIVE_ND );
-
-	for ( index = 0; index < MAX_MASTER_SERVERS; index++ )
+	sv_master[0] = Cvar_Get( "sv_master1", MASTER_SERVER_NAME, CVAR_ARCHIVE_ND );
+	sv_master[1] = Cvar_Get( "sv_master2", "master.ioquake3.org", CVAR_ARCHIVE_ND );
+	sv_master[2] = Cvar_Get( "sv_master3", "master.maverickservers.com", CVAR_ARCHIVE_ND );
+	for ( index = 3; index < MAX_MASTER_SERVERS; index++ )
 		sv_master[ index ] = Cvar_Get( va( "sv_master%d", index + 1 ), "", CVAR_ARCHIVE_ND );
 
 	sv_reconnectlimit = Cvar_Get( "sv_reconnectlimit", "3", 0 );
@@ -878,6 +898,8 @@ void SV_Shutdown( const char *finalmsg ) {
 		return;
 	}
 
+	SV_MVD_StopRecord();
+
 	Com_Printf( "----- Server Shutdown (%s) -----\n", finalmsg );
 
 #ifdef USE_IPV6
@@ -890,7 +912,16 @@ void SV_Shutdown( const char *finalmsg ) {
 
 	SV_RemoveOperatorCommands();
 	SV_MasterShutdown();
+
+	// Notify game of server shutdown before normal shutdown
+	if ( gvm && sv_gameServerEvents ) {
+		VM_Call( gvm, 0, GAME_SERVER_STOPPING );
+	}
 	SV_ShutdownGameProgs();
+
+	// Reset server startup flag so next map load triggers a new startup event
+	sv_serverStarting = qtrue;
+	sv_gameServerEvents = qfalse;
 	SV_InitChallenger();
 
 	// free current level

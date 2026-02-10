@@ -229,6 +229,9 @@ typedef struct client_s {
 	char			tld[3]; // "XX\0"
 	const char		*country;
 
+	// VR support
+	qboolean		isVR;				// Client is VR (from userinfo)
+
 } client_t;
 
 //=============================================================================
@@ -281,6 +284,9 @@ extern	serverStatic_t	svs;				// persistant server info across maps
 extern	server_t		sv;					// cleared each map
 extern	vm_t			*gvm;				// game virtual machine
 
+extern	qboolean		sv_serverStarting;		// True until first GAME_INIT completes
+extern	qboolean		sv_gameServerEvents;	// True if game supports server event logging
+
 extern	cvar_t	*sv_fps;
 extern	cvar_t	*sv_timeout;
 extern	cvar_t	*sv_zombietime;
@@ -317,6 +323,62 @@ extern	cvar_t	*sv_banFile;
 extern	serverBan_t serverBans[SERVER_MAXBANS];
 extern	int serverBansCount;
 #endif
+
+// MVD recording state
+#define MAX_MVD_MSGLEN      (256*1024)
+#define MVD_KEYFRAME_INTERVAL 150
+#define MAX_MVD_KEYFRAMES   8192
+#define MAX_MVD_CMDS        256
+#define MAX_MVD_CMDBUF      (64*1024)
+
+typedef struct {
+    int         target;     // client index or -1 for broadcast
+    int         offset;     // offset into cmdBuf
+    int         len;
+} mvdCmd_t;
+
+typedef struct {
+    int         serverTime;
+    unsigned int fileOffset; // low 32 bits
+    unsigned int fileOffsetHi; // high 32 bits
+} mvdKeyframe_t;
+
+typedef struct {
+    qboolean    recording;
+    fileHandle_t file;
+    unsigned int fileOffset;
+    unsigned int fileOffsetHi; // for >4GB (unlikely)
+
+    int         frameCount;
+
+    // Previous-frame baselines for delta encoding
+    entityState_t   prevEntities[MAX_GENTITIES];
+    byte            prevEntityBitmask[MAX_GENTITIES/8]; // 128 bytes
+    playerState_t   prevPlayers[MAX_CLIENTS];
+    byte            prevPlayerBitmask[MAX_CLIENTS/8];   // 8 bytes
+
+    // Per-frame server command capture
+    mvdCmd_t    cmds[MAX_MVD_CMDS];
+    int         cmdCount;
+    char        cmdBuf[MAX_MVD_CMDBUF];
+    int         cmdBufUsed;
+
+    // Per-frame configstring change tracking
+    qboolean    csChanged[MAX_CONFIGSTRINGS];
+
+    // Keyframe index (written at end of file)
+    mvdKeyframe_t keyframes[MAX_MVD_KEYFRAMES];
+    int         keyframeCount;
+
+    // Write buffer
+    byte        msgBuf[MAX_MVD_MSGLEN];
+
+    // Header position where index offset needs patching
+    unsigned int indexOffsetPos;
+} mvdState_t;
+
+extern mvdState_t mvd;
+extern cvar_t *sv_mvdauto;
 
 //===========================================================
 
@@ -498,3 +560,15 @@ void SV_LoadFilters( const char *filename );
 const char *SV_RunFilters( const char *userinfo, const netadr_t *addr );
 void SV_AddFilter_f( void );
 void SV_AddFilterCmd_f( void );
+
+//
+// sv_mvd.c
+//
+void SV_MVD_Init( void );
+void SV_MVD_StartRecord_f( void );
+void SV_MVD_StopRecord_f( void );
+void SV_MVD_WriteFrame( void );
+void SV_MVD_StopRecord( void );
+void SV_MVD_ConfigstringChanged( int index );
+void SV_MVD_CaptureServerCommand( int target, const char *cmd );
+void SV_MVD_AutoStart( void );
