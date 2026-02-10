@@ -1017,7 +1017,6 @@ static void CL_TV_View_f( void ) {
 
 	tvPlay.viewpoint = n;
 	CL_TV_RebuildSnapshots();
-	Com_Printf( "TV: Following client %i\n", n );
 }
 
 
@@ -1046,7 +1045,6 @@ static void CL_TV_ViewNext_f( void ) {
 	if ( next != tvPlay.viewpoint ) {
 		tvPlay.viewpoint = next;
 		CL_TV_RebuildSnapshots();
-		Com_Printf( "TV: Following client %i\n", next );
 	}
 }
 
@@ -1076,7 +1074,6 @@ static void CL_TV_ViewPrev_f( void ) {
 	if ( prev != tvPlay.viewpoint ) {
 		tvPlay.viewpoint = prev;
 		CL_TV_RebuildSnapshots();
-		Com_Printf( "TV: Following client %i\n", prev );
 	}
 }
 
