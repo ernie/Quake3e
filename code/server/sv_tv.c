@@ -91,6 +91,25 @@ static void SV_TV_CompressWrite( const void *data, int len ) {
 
 /*
 ===============
+SV_TV_DefaultName
+
+Generate a default recording name: prefer g_matchUUID, fall back to timestamp.
+===============
+*/
+static const char *SV_TV_DefaultName( char *buf, int bufSize ) {
+	const char *uuid = Cvar_VariableString( "g_matchUUID" );
+	if ( uuid[0] != '\0' ) {
+		return uuid;
+	}
+	time_t now = time( NULL );
+	struct tm *tm_info = localtime( &now );
+	strftime( buf, bufSize, "%Y%m%d_%H%M%S", tm_info );
+	return buf;
+}
+
+
+/*
+===============
 SV_TV_StartRecord
 ===============
 */
@@ -210,10 +229,7 @@ void SV_TV_StartRecord_f( void ) {
 	if ( Cmd_Argc() >= 2 ) {
 		filename = Cmd_Argv( 1 );
 	} else {
-		time_t now = time( NULL );
-		struct tm *tm_info = localtime( &now );
-		strftime( defaultName, sizeof( defaultName ), "tv_%Y%m%d_%H%M%S", tm_info );
-		filename = defaultName;
+		filename = SV_TV_DefaultName( defaultName, sizeof( defaultName ) );
 	}
 
 	SV_TV_StartRecord( filename );
@@ -241,20 +257,9 @@ void SV_TV_WriteFrame( void ) {
 			// Match-state-aware mod (e.g. Trinity): start on "active"
 			if ( !Q_stricmp( matchState, "active" ) ) {
 				char name[MAX_QPATH];
-				const char *uuid;
 
 				tv.autoPending = qfalse;
-
-				uuid = Cvar_VariableString( "g_matchUUID" );
-				if ( uuid[0] != '\0' ) {
-					Com_sprintf( name, sizeof( name ), "%s", uuid );
-				} else {
-					time_t now = time( NULL );
-					struct tm *tm_info = localtime( &now );
-					strftime( name, sizeof( name ), "tv_%Y%m%d_%H%M%S", tm_info );
-				}
-
-				SV_TV_StartRecord( name );
+				SV_TV_StartRecord( SV_TV_DefaultName( name, sizeof( name ) ) );
 				tv.autoRecording = qtrue;
 			}
 		} else {
@@ -262,20 +267,9 @@ void SV_TV_WriteFrame( void ) {
 			for ( i = 0; i < sv.maxclients; i++ ) {
 				if ( svs.clients[i].state == CS_ACTIVE ) {
 					char name[MAX_QPATH];
-					const char *uuid;
 
 					tv.autoPending = qfalse;
-
-					uuid = Cvar_VariableString( "g_matchUUID" );
-					if ( uuid[0] != '\0' ) {
-						Com_sprintf( name, sizeof( name ), "%s", uuid );
-					} else {
-						time_t now = time( NULL );
-						struct tm *tm_info = localtime( &now );
-						strftime( name, sizeof( name ), "tv_%Y%m%d_%H%M%S", tm_info );
-					}
-
-					SV_TV_StartRecord( name );
+					SV_TV_StartRecord( SV_TV_DefaultName( name, sizeof( name ) ) );
 					tv.autoRecording = qtrue;
 					break;
 				}
