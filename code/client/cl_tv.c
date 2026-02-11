@@ -34,6 +34,10 @@ static void CL_TV_ViewNext_f( void );
 static void CL_TV_ViewPrev_f( void );
 static void CL_TV_Seek_f( void );
 
+// playerState_t.persistant[] indices (from game/bg_public.h)
+#define TV_PERS_TEAM					3
+#define TV_TEAM_SPECTATOR				3
+
 
 /*
 ===============
@@ -81,7 +85,8 @@ Returns -1 if none found.
 static int CL_TV_FindFirstActivePlayer( void ) {
 	int i;
 	for ( i = 0; i < MAX_CLIENTS; i++ ) {
-		if ( tvPlay.playerBitmask[i >> 3] & ( 1 << ( i & 7 ) ) ) {
+		if ( ( tvPlay.playerBitmask[i >> 3] & ( 1 << ( i & 7 ) ) )
+				&& tvPlay.players[i].persistant[TV_PERS_TEAM] != TV_TEAM_SPECTATOR ) {
 			return i;
 		}
 	}
@@ -1036,7 +1041,8 @@ static void CL_TV_ViewNext_f( void ) {
 	next = tvPlay.viewpoint;
 	for ( i = 1; i <= MAX_CLIENTS; i++ ) {
 		int candidate = ( tvPlay.viewpoint + i ) % MAX_CLIENTS;
-		if ( tvPlay.playerBitmask[candidate >> 3] & ( 1 << ( candidate & 7 ) ) ) {
+		if ( ( tvPlay.playerBitmask[candidate >> 3] & ( 1 << ( candidate & 7 ) ) )
+				&& tvPlay.players[candidate].persistant[TV_PERS_TEAM] != TV_TEAM_SPECTATOR ) {
 			next = candidate;
 			break;
 		}
@@ -1065,7 +1071,8 @@ static void CL_TV_ViewPrev_f( void ) {
 	prev = tvPlay.viewpoint;
 	for ( i = 1; i <= MAX_CLIENTS; i++ ) {
 		int candidate = ( tvPlay.viewpoint - i + MAX_CLIENTS ) % MAX_CLIENTS;
-		if ( tvPlay.playerBitmask[candidate >> 3] & ( 1 << ( candidate & 7 ) ) ) {
+		if ( ( tvPlay.playerBitmask[candidate >> 3] & ( 1 << ( candidate & 7 ) ) )
+				&& tvPlay.players[candidate].persistant[TV_PERS_TEAM] != TV_TEAM_SPECTATOR ) {
 			prev = candidate;
 			break;
 		}

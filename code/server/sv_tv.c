@@ -263,8 +263,11 @@ void SV_TV_WriteFrame( void ) {
 		for ( i = 0; i < sv.maxclients; i++ ) {
 			if ( svs.clients[i].state == CS_ACTIVE &&
 				 svs.clients[i].netchan.remoteAddress.type != NA_BOT ) {
-				tv.hadHuman = qtrue;
-				break;
+				playerState_t *ps = SV_GameClientNum( i );
+				if ( ps->persistant[ PERS_TEAM ] != TEAM_SPECTATOR ) {
+					tv.hadHuman = qtrue;
+					break;
+				}
 			}
 		}
 	}
