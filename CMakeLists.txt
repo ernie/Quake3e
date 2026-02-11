@@ -1,6 +1,6 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.12)
 
-PROJECT(quake3e)
+PROJECT(trinity)
 
 SET(CNAME "trinity")
 SET(DNAME "trinity.ded")
