@@ -452,11 +452,15 @@ void CL_TV_ReadFrame( void ) {
 		}
 	}
 
-	// NOTE: Do NOT zero entities when they leave the bitmask.
-	// The writer's prevEntities retains stale data for removed entities,
-	// so deltas for reappearing entities are computed from the old state.
-	// Our running state must match the writer's baseline for correct decoding.
-	// The bitmask controls what goes into snapshots, so stale data is harmless.
+	// Zero entities that left the bitmask to match the writer's baseline.
+	// The writer zeroes prevEntities for removed entities (sv_tv.c),
+	// so our running state must also be zeroed for correct delta decoding.
+	for ( i = 0; i < MAX_GENTITIES; i++ ) {
+		if ( ( oldEntityBitmask[i >> 3] & ( 1 << ( i & 7 ) ) ) &&
+			 !( tvPlay.entityBitmask[i >> 3] & ( 1 << ( i & 7 ) ) ) ) {
+			Com_Memset( &tvPlay.entities[i], 0, sizeof( entityState_t ) );
+		}
+	}
 
 	// --- Player section ---
 	Com_Memcpy( oldPlayerBitmask, tvPlay.playerBitmask, sizeof( oldPlayerBitmask ) );
@@ -480,8 +484,15 @@ void CL_TV_ReadFrame( void ) {
 		tvPlay.players[clientNum] = tempPlayer;
 	}
 
-	// NOTE: Do NOT zero players when they leave the bitmask.
-	// Same reason as entities: writer's prevPlayers retains stale data.
+	// Zero players that left the bitmask to match the writer's baseline.
+	// The writer zeroes prevPlayers for removed players (sv_tv.c),
+	// so our running state must also be zeroed for correct delta decoding.
+	for ( i = 0; i < MAX_CLIENTS; i++ ) {
+		if ( ( oldPlayerBitmask[i >> 3] & ( 1 << ( i & 7 ) ) ) &&
+			 !( tvPlay.playerBitmask[i >> 3] & ( 1 << ( i & 7 ) ) ) ) {
+			Com_Memset( &tvPlay.players[i], 0, sizeof( playerState_t ) );
+		}
+	}
 
 	// Auto-switch viewpoint if current player disconnected
 	if ( !( tvPlay.playerBitmask[tvPlay.viewpoint >> 3] & ( 1 << ( tvPlay.viewpoint & 7 ) ) ) ) {
