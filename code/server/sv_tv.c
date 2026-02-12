@@ -27,6 +27,7 @@ cvar_t *sv_tvAuto;
 cvar_t *sv_tvAutoMinPlayers;
 cvar_t *sv_tvAutoMinPlayersSecs;
 cvar_t *sv_tvpath;
+cvar_t *sv_tvDownload;
 
 
 /*
@@ -46,6 +47,9 @@ void SV_TV_Init( void ) {
 
 	sv_tvpath = Cvar_Get( "sv_tvpath", "demos", CVAR_ARCHIVE );
 	Cvar_SetDescription( sv_tvpath, "Directory for TV recordings." );
+
+	sv_tvDownload = Cvar_Get( "sv_tvDownload", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( sv_tvDownload, "Notify clients to download TV recordings via HTTP at end of match. Requires sv_dlURL." );
 }
 
 
@@ -460,6 +464,8 @@ void SV_TV_StopRecord( qboolean discard ) {
 	float duration;
 
 	tv.autoPending = qfalse;
+	tv.lastRecordedFile[0] = '\0';
+	tv.lastRecordedMap[0] = '\0';
 
 	if ( !tv.recording ) {
 		return;
@@ -525,6 +531,9 @@ void SV_TV_StopRecord( qboolean discard ) {
 		// Rename .tvd.tmp to .tvd
 		Com_sprintf( finalPath, sizeof( finalPath ), "%s.tvd", tv.recordingPath );
 		FS_Rename( tmpPath, finalPath );
+
+		Q_strncpyz( tv.lastRecordedFile, finalPath, sizeof( tv.lastRecordedFile ) );
+		Q_strncpyz( tv.lastRecordedMap, sv_mapname->string, sizeof( tv.lastRecordedMap ) );
 
 		duration = (float)durationMsec / 1000.0f;
 

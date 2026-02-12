@@ -15,6 +15,8 @@ and seeking via replay from the beginning.
 - `sv_tvAuto` — automatic recording on map load
 - `sv_tvAutoMinPlayers` — minimum concurrent non-spectator human players to keep auto-recording (0 = always keep)
 - `sv_tvAutoMinPlayersSecs` — seconds the threshold must be continuously met (0 = instantaneous)
+- `sv_tvDownload` — notify clients to download the completed demo via HTTP at map change (requires `sv_dlURL`)
+- `cl_tvDownload` — opt in to automatic TV demo downloads from the server
 - Client-side viewpoint switching and seek during playback
 
 ### VR Client Support

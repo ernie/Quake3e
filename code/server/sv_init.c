@@ -615,6 +615,8 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 					// the new gamestate will be sent
 					svs.clients[i].state = CS_CONNECTED;
 					svs.clients[i].gentity = NULL;
+					// mark for TV demo download notification if available
+					svs.clients[i].tvDemoPending = ( sv_tvDownload->integer && tv.lastRecordedFile[0] ) ? qtrue : qfalse;
 				} else {
 					SV_ClientEnterWorld( &svs.clients[i] );
 				}

@@ -1146,4 +1146,177 @@ qboolean Com_DL_Perform( download_t *dl )
 	return qtrue;
 }
 
+
+/*
+==================================
+
+TV Demo Download Functions
+
+Standalone HTTP download for TV demo files.
+Uses a separate download_t instance so it doesn't
+interfere with pk3 downloads. Skips pk3-specific
+signature and header validation.
+
+==================================
+*/
+
+download_t tvDownload;
+
+
+static size_t CL_TV_CallbackWrite( void *ptr, size_t size, size_t nmemb, void *userdata )
+{
+	download_t *dl = (download_t *)userdata;
+
+	if ( dl->fHandle == FS_INVALID_HANDLE ) {
+		dl->fHandle = FS_SV_FOpenFileWrite( dl->TempName );
+		if ( dl->fHandle == FS_INVALID_HANDLE ) {
+			return (size_t)-1;
+		}
+	}
+
+	FS_Write( ptr, size * nmemb, dl->fHandle );
+	return size * nmemb;
+}
+
+
+qboolean CL_TV_BeginDownload( const char *localName, const char *remoteURL )
+{
+	download_t *dl = &tvDownload;
+
+	if ( Com_DL_InProgress( dl ) ) {
+		Com_Printf( S_COLOR_YELLOW "TV: already downloading %s\n", dl->Name );
+		return qfalse;
+	}
+
+	Com_DL_Cleanup( dl );
+
+	if ( !Com_DL_Init( dl ) ) {
+		Com_Printf( S_COLOR_YELLOW "TV: error initializing cURL library\n" );
+		return qfalse;
+	}
+
+	dl->cURL = dl->func.easy_init();
+	if ( !dl->cURL ) {
+		Com_Printf( S_COLOR_RED "TV: easy_init() failed\n" );
+		Com_DL_Cleanup( dl );
+		return qfalse;
+	}
+
+	Q_strncpyz( dl->URL, remoteURL, sizeof( dl->URL ) );
+	Q_strncpyz( dl->Name, localName, sizeof( dl->Name ) );
+
+	Q_strncpyz( dl->gameDir, FS_GetCurrentGameDir(), sizeof( dl->gameDir ) );
+
+	Com_sprintf( dl->TempName, sizeof( dl->TempName ),
+		"%s%c%s.tmp", dl->gameDir, PATH_SEP, dl->Name );
+
+	Com_Printf( "TV: downloading %s\n", dl->URL );
+
+	if ( com_developer->integer )
+		dl->func.easy_setopt( dl->cURL, CURLOPT_VERBOSE, 1 );
+
+	dl->func.easy_setopt( dl->cURL, CURLOPT_URL, dl->URL );
+	dl->func.easy_setopt( dl->cURL, CURLOPT_TRANSFERTEXT, 0 );
+	dl->func.easy_setopt( dl->cURL, CURLOPT_REFERER, dl->URL );
+	dl->func.easy_setopt( dl->cURL, CURLOPT_USERAGENT, Q3_VERSION );
+	dl->func.easy_setopt( dl->cURL, CURLOPT_WRITEFUNCTION, CL_TV_CallbackWrite );
+	dl->func.easy_setopt( dl->cURL, CURLOPT_WRITEDATA, dl );
+	dl->func.easy_setopt( dl->cURL, CURLOPT_NOPROGRESS, 0 );
+#if CURL_AT_LEAST_VERSION(7, 32, 0)
+	dl->func.easy_setopt( dl->cURL, CURLOPT_XFERINFOFUNCTION, Com_DL_CallbackProgress );
+	dl->func.easy_setopt( dl->cURL, CURLOPT_XFERINFODATA, dl );
+#else
+	dl->func.easy_setopt( dl->cURL, CURLOPT_PROGRESSFUNCTION, Com_DL_CallbackProgress );
+	dl->func.easy_setopt( dl->cURL, CURLOPT_PROGRESSDATA, dl );
+#endif
+	dl->func.easy_setopt( dl->cURL, CURLOPT_FAILONERROR, 1 );
+	dl->func.easy_setopt( dl->cURL, CURLOPT_FOLLOWLOCATION, 1 );
+	dl->func.easy_setopt( dl->cURL, CURLOPT_MAXREDIRS, 5 );
+#if CURL_AT_LEAST_VERSION(7, 85, 0)
+	dl->func.easy_setopt( dl->cURL, CURLOPT_PROTOCOLS_STR, ALLOWED_PROTOCOLS_STR );
+#else
+	dl->func.easy_setopt( dl->cURL, CURLOPT_PROTOCOLS, ALLOWED_PROTOCOLS );
+#endif
+
+#ifdef CURL_MAX_READ_SIZE
+	dl->func.easy_setopt( dl->cURL, CURLOPT_BUFFERSIZE, CURL_MAX_READ_SIZE );
+#endif
+
+	dl->cURLM = dl->func.multi_init();
+	if ( !dl->cURLM ) {
+		Com_DL_Cleanup( dl );
+		Com_Printf( S_COLOR_RED "TV: multi_init() failed\n" );
+		return qfalse;
+	}
+
+	if ( dl->func.multi_add_handle( dl->cURLM, dl->cURL ) != CURLM_OK ) {
+		Com_DL_Cleanup( dl );
+		Com_Printf( S_COLOR_RED "TV: multi_add_handle() failed\n" );
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+
+qboolean CL_TV_PerformDownload( void )
+{
+	download_t *dl = &tvDownload;
+	CURLMcode res;
+	CURLMsg *msg;
+	int c;
+	int i;
+
+	res = dl->func.multi_perform( dl->cURLM, &c );
+
+	i = 0;
+	while ( res == CURLM_CALL_MULTI_PERFORM && i < 128 ) {
+		res = dl->func.multi_perform( dl->cURLM, &c );
+		i++;
+	}
+	if ( res == CURLM_CALL_MULTI_PERFORM ) {
+		return qtrue;
+	}
+
+	msg = dl->func.multi_info_read( dl->cURLM, &c );
+	if ( msg == NULL ) {
+		return qtrue;
+	}
+
+	if ( dl->fHandle != FS_INVALID_HANDLE ) {
+		FS_FCloseFile( dl->fHandle );
+		dl->fHandle = FS_INVALID_HANDLE;
+	}
+
+	if ( msg->msg == CURLMSG_DONE && msg->data.result == CURLE_OK ) {
+		char finalName[MAX_OSPATH];
+
+		Com_sprintf( finalName, sizeof( finalName ), "%s%c%s",
+			dl->gameDir, PATH_SEP, dl->Name );
+
+		FS_SV_Rename( dl->TempName, finalName );
+		dl->TempName[0] = '\0'; // prevent Com_DL_Cleanup from deleting the renamed file
+
+		Com_Printf( S_COLOR_GREEN "TV: %s downloaded\n", dl->Name );
+		Com_DL_Cleanup( dl );
+		return qfalse;
+	} else {
+		long code;
+
+		dl->func.easy_getinfo( msg->easy_handle, CURLINFO_RESPONSE_CODE, &code );
+		Com_Printf( S_COLOR_RED "TV: download error: %s Code: %ld\n",
+			dl->func.easy_strerror( msg->data.result ), code );
+		Com_DL_Cleanup( dl );
+	}
+
+	return qfalse;
+}
+
+
+void CL_TV_CleanupDownload( void )
+{
+	Com_DL_Cleanup( &tvDownload );
+}
+
+
 #endif /* USE_CURL */

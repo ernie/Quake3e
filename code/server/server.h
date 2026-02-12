@@ -232,6 +232,9 @@ typedef struct client_s {
 	// VR support
 	qboolean		isVR;				// Client is VR (from userinfo)
 
+	// TV demo download notification pending for this client
+	qboolean		tvDemoPending;
+
 } client_t;
 
 //=============================================================================
@@ -371,6 +374,8 @@ typedef struct {
     qboolean    keepRecording;      // threshold met, do not auto-delete
     int         thresholdMetTime;   // sv.time when threshold was first continuously met (0 = not met)
     char        recordingPath[MAX_QPATH]; // path for potential deletion
+    char        lastRecordedFile[MAX_QPATH]; // finalized demo path for download notification
+    char        lastRecordedMap[MAX_QPATH];  // map name at time of recording
 
     // Zstd streaming compression
     ZSTD_CStream    *cstream;
@@ -382,6 +387,7 @@ extern cvar_t *sv_tvAuto;
 extern cvar_t *sv_tvAutoMinPlayers;
 extern cvar_t *sv_tvAutoMinPlayersSecs;
 extern cvar_t *sv_tvpath;
+extern cvar_t *sv_tvDownload;
 
 //===========================================================
 

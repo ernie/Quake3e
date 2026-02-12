@@ -69,6 +69,7 @@ cvar_t	*cl_guidServerUniq;
 
 cvar_t	*cl_dlURL;
 cvar_t	*cl_dlDirectory;
+cvar_t	*cl_tvDownload;
 
 cvar_t	*cl_reconnectArgs;
 
@@ -1267,6 +1268,12 @@ qboolean CL_Disconnect( qboolean showMainMenu ) {
 	}
 	*clc.downloadTempName = *clc.downloadName = '\0';
 	Cvar_Set( "cl_downloadName", "" );
+
+#ifdef USE_CURL
+	CL_TV_CleanupDownload();
+#endif
+	clc.tvDemoFile[0] = '\0';
+	clc.tvDemoMap[0] = '\0';
 
 	// Stop recording any video
 	if ( CL_VideoRecording() ) {
@@ -3027,6 +3034,38 @@ void CL_Frame( int msec, int realMsec ) {
 	if ( download.cURL ) {
 		Com_DL_Perform( &download );
 	}
+	if ( tvDownload.cURL ) {
+		CL_TV_PerformDownload();
+	}
+	// initiate TV demo download once the client has entered the game
+	if ( cls.state == CA_ACTIVE && clc.tvDemoFile[0]
+		&& !Com_DL_InProgress( &tvDownload ) && cl_tvDownload->integer ) {
+		if ( clc.sv_dlURL[0] && CL_cURL_Init() ) {
+			char url[MAX_OSPATH];
+			char localName[MAX_QPATH];
+			time_t now;
+			struct tm *tm_info;
+
+			Com_sprintf( url, sizeof( url ), "%s/%s", clc.sv_dlURL, clc.tvDemoFile );
+
+			// generate local filename with timestamp and map name
+			now = time( NULL );
+			tm_info = localtime( &now );
+			if ( tm_info && clc.tvDemoMap[0] ) {
+				char timestamp[32];
+				strftime( timestamp, sizeof( timestamp ), "%Y%m%d_%H%M%S", tm_info );
+				Com_sprintf( localName, sizeof( localName ), "demos/%s_%s.tvd", timestamp, clc.tvDemoMap );
+			} else {
+				Q_strncpyz( localName, clc.tvDemoFile, sizeof( localName ) );
+			}
+
+			CL_TV_BeginDownload( localName, url );
+		} else {
+			Com_DPrintf( "TV: sv_dlURL not set, skipping demo download\n" );
+		}
+		clc.tvDemoFile[0] = '\0';
+		clc.tvDemoMap[0] = '\0';
+	}
 #endif
 
 	if ( !com_cl_running->integer ) {
@@ -4012,6 +4051,9 @@ void CL_Init( void ) {
 		" 0 - current game directory\n"
 		" 1 - basegame (%s) directory\n", FS_GetBaseGameDir() );
 	Cvar_SetDescription( cl_dlDirectory, s );
+
+	cl_tvDownload = Cvar_Get( "cl_tvDownload", "0", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( cl_tvDownload, "Download TV demo recordings from server via HTTP at end of match." );
 
 	cl_reconnectArgs = Cvar_Get( "cl_reconnectArgs", "", CVAR_ARCHIVE_ND | CVAR_NOTABCOMPLETE );
 

@@ -362,6 +362,20 @@ rescan:
 		return qtrue;
 	}
 
+	// TV demo download notification from server
+	if ( !strcmp( cmd, "tvdemo" ) ) {
+		if ( argc >= 2 ) {
+			Q_strncpyz( clc.tvDemoFile, Cmd_Argv(1), sizeof( clc.tvDemoFile ) );
+			if ( argc >= 3 ) {
+				Q_strncpyz( clc.tvDemoMap, Cmd_Argv(2), sizeof( clc.tvDemoMap ) );
+			} else {
+				clc.tvDemoMap[0] = '\0';
+			}
+			Com_DPrintf( "TV: demo available for download: %s (map: %s)\n", clc.tvDemoFile, clc.tvDemoMap );
+		}
+		return qfalse;
+	}
+
 	// we may want to put a "connect to other server" command here
 
 	// cgame can now act on the command

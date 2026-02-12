@@ -286,6 +286,10 @@ typedef struct {
 	CURLM		*downloadCURLM;
 #endif /* USE_CURL */
 
+	// TV demo download
+	char		tvDemoFile[MAX_QPATH]; // pending TV demo remote path for HTTP download
+	char		tvDemoMap[MAX_QPATH];  // map name for local filename generation
+
 	// demo information
 	char		demoName[MAX_OSPATH];
 	char		recordName[MAX_OSPATH]; // without extension
@@ -436,12 +440,17 @@ extern	qboolean	cl_oldGameSet;
 #ifdef USE_CURL
 
 extern		download_t	download;
+extern		download_t	tvDownload;
 qboolean	Com_DL_Perform( download_t *dl );
 void		Com_DL_Cleanup( download_t *dl );
 qboolean	Com_DL_Begin( download_t *dl, const char *localName, const char *remoteURL, qboolean autoDownload );
 qboolean	Com_DL_InProgress( const download_t *dl );
 qboolean	Com_DL_ValidFileName( const char *fileName );
 qboolean	CL_Download( const char *cmd, const char *pakname, qboolean autoDownload );
+
+qboolean	CL_TV_BeginDownload( const char *localName, const char *remoteURL );
+qboolean	CL_TV_PerformDownload( void );
+void		CL_TV_CleanupDownload( void );
 
 #endif
 
@@ -474,6 +483,7 @@ extern	cvar_t	*cl_allowDownload;
 #ifdef USE_CURL
 extern	cvar_t	*cl_mapAutoDownload;
 extern	cvar_t	*cl_dlDirectory;
+extern	cvar_t	*cl_tvDownload;
 #endif
 extern	cvar_t	*cl_conXOffset;
 extern	cvar_t	*cl_conColor;
