@@ -882,6 +882,8 @@ static void CL_PlayDemo_f( void ) {
 			return;
 		}
 
+		clc.lastPacketTime = cls.realtime;
+
 		Q_strncpyz( clc.demoName, arg, sizeof( clc.demoName ) );
 		Q_strncpyz( cls.servername, arg, sizeof( cls.servername ) );
 		cls.state = CA_CONNECTED;
@@ -2925,6 +2927,10 @@ static void CL_CheckTimeout( void ) {
 	//
 	// check timeout
 	//
+	if ( tvPlay.active ) {
+		clc.lastPacketTime = cls.realtime;
+		return;
+	}
 	if ( ( !CL_CheckPaused() || !sv_paused->integer )
 		&& cls.state >= CA_CONNECTED && cls.state != CA_CINEMATIC
 		&& cls.realtime - clc.lastPacketTime > cl_timeout->integer * 1000 ) {
