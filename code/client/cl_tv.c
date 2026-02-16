@@ -23,6 +23,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "client.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 tvPlayback_t tvPlay;
 
 cvar_t *cl_tvViewpoint;
@@ -1314,4 +1318,55 @@ static void CL_TV_Seek_f( void ) {
 
 	seconds = atoi( Cmd_Argv( 1 ) );
 	CL_TV_Seek( tvPlay.firstServerTime + seconds * 1000 );
+}
+
+
+/*
+===============
+CL_TV_GetPlayerList
+
+Returns a tab/newline-delimited string of active players for the web UI.
+Format: "<viewpoint>\n<clientnum>\t<name>\t<team>\n..."
+===============
+*/
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
+const char *CL_TV_GetPlayerList( void ) {
+	static char buf[4096];
+	int len, i;
+	const char *cs, *name;
+
+	if ( !tvPlay.active ) {
+		buf[0] = '\0';
+		return buf;
+	}
+
+	// First line: current viewpoint
+	len = Com_sprintf( buf, sizeof( buf ), "%i\n", tvPlay.viewpoint );
+
+	for ( i = 0; i < MAX_CLIENTS; i++ ) {
+		char nameBuf[MAX_QPATH], modelBuf[MAX_QPATH];
+		int isVR;
+
+		if ( !( tvPlay.playerBitmask[i >> 3] & ( 1 << ( i & 7 ) ) ) ) {
+			continue;
+		}
+		if ( tvPlay.players[i].persistant[TV_PERS_TEAM] == TV_TEAM_SPECTATOR ) {
+			continue;
+		}
+
+		cs = cl.gameState.stringData + cl.gameState.stringOffsets[CS_PLAYERS + i];
+
+		// Info_ValueForKey uses a 2-entry static buffer, so copy results
+		// before making more than 2 calls
+		Q_strncpyz( nameBuf, Info_ValueForKey( cs, "n" ), sizeof( nameBuf ) );
+		Q_strncpyz( modelBuf, Info_ValueForKey( cs, "model" ), sizeof( modelBuf ) );
+		isVR = atoi( Info_ValueForKey( cs, "vr" ) );
+
+		len += Com_sprintf( buf + len, sizeof( buf ) - len, "%i\t%s\t%i\t%s\t%i\n",
+			i, nameBuf, tvPlay.players[i].persistant[TV_PERS_TEAM], modelBuf, isVR );
+	}
+
+	return buf;
 }
