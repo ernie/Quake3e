@@ -1533,7 +1533,7 @@ web:
 	@cp $(WEB_BUILD_DIR)/trinity-loader.js dist/web/demo-loader.js
 	@cp $(WEB_BUILD_DIR)/trinity.js dist/web/trinity.js
 	@cp $(WEB_BUILD_DIR)/trinity.wasm dist/web/trinity.wasm
-	@cp $(WEB_BUILD_DIR)/trinity-config.json dist/web/trinity-config.json
+	@cp code/web/client-config.json dist/web/trinity-config.json
 	@echo "Web build ready in dist/web/"
 
 demoplayer:
@@ -1544,7 +1544,7 @@ demoplayer:
 	@cp $(DEMOPLAYER_BUILD_DIR)/trinity-loader.js dist/demo/demo-loader.js
 	@cp $(DEMOPLAYER_BUILD_DIR)/trinity.js dist/demo/trinity.js
 	@cp $(DEMOPLAYER_BUILD_DIR)/trinity.wasm dist/demo/trinity.wasm
-	@cp $(DEMOPLAYER_BUILD_DIR)/trinity-config.json dist/demo/trinity-config.json
+	@cp code/web/demoplayer-config.json dist/demo/trinity-config.json
 	@echo "Demo player build ready in dist/demo/"
 
 clean-web:

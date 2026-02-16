@@ -41,9 +41,10 @@ async function cachedFetch(url, label, statusEl) {
  * @param {string[]} [opts.extraPk3s] - Additional pk3 URLs to load
  * @param {string} [opts.extraArgs] - Additional engine command-line arguments
  * @param {function} [opts.onProgress] - Progress callback(loaded, total)
+ * @param {function} [opts.onReady] - Called once after the first rendered frame
  * @returns {Promise<Object>} The Emscripten Module instance
  */
-export async function loadDemo({ canvas, statusEl, enginePath, demoUrl, extraPk3s = [], extraArgs = '', onProgress }) {
+export async function loadDemo({ canvas, statusEl, enginePath, demoUrl, extraPk3s = [], extraArgs = '', onProgress, onReady }) {
     if (window.location.protocol === 'file:') {
         throw new Error('Browser security restrictions prevent loading wasm from a file: URL. Serve this file via a web server.');
     }
@@ -138,8 +139,23 @@ export async function loadDemo({ canvas, statusEl, enginePath, demoUrl, extraPk3
         canvas: canvas,
         arguments: generatedArguments.trim().split(/\s+/),
         locateFile: (file) => enginePath + file,
+        postMainLoop: () => {
+            // Fire one-shot onNextFrame callbacks after each engine frame
+            if (modulePromise._nextFrameCbs && modulePromise._nextFrameCbs.length) {
+                const cbs = modulePromise._nextFrameCbs.splice(0);
+                for (const cb of cbs) { try { cb(); } catch {} }
+            }
+            // Fire onReady once on the first rendered frame
+            if (onReady && !modulePromise._readyFired) {
+                modulePromise._readyFired = true;
+                try { onReady(); } catch {}
+            }
+        },
         preRun: [async (mod) => {
             resolveModule(mod);
+            // Provide onNextFrame helper: queues a callback for after the next engine frame
+            modulePromise._nextFrameCbs = [];
+            mod.onNextFrame = (cb) => { modulePromise._nextFrameCbs.push(cb); };
             mod.addRunDependency('setup-trinity-filesystem');
             try {
                     const config = await configPromise;
