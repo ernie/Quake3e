@@ -677,7 +677,8 @@ void CL_TV_ReadFrame( void ) {
 	}
 
 	// Auto-switch viewpoint if current player disconnected
-	if ( !( tvPlay.playerBitmask[tvPlay.viewpoint >> 3] & ( 1 << ( tvPlay.viewpoint & 7 ) ) ) ) {
+	// Skip during seek: early replay frames may not yet contain the followed player
+	if ( !tvPlay.seeking && !( tvPlay.playerBitmask[tvPlay.viewpoint >> 3] & ( 1 << ( tvPlay.viewpoint & 7 ) ) ) ) {
 		int newVp = CL_TV_FindFirstActivePlayer();
 		if ( newVp >= 0 ) {
 			tvPlay.viewpoint = newVp;
