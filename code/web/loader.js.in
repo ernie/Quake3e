@@ -1,21 +1,27 @@
-// Trinity demo loader - ES module
-// Exports loadDemo() for use by standalone player and tracker integration
+// Trinity engine loader - ES module
+// Exports loadEngine() for use by standalone player, demo player, and tracker integration
 
 const CLIENT_NAME = '@CLIENT_NAME@';
 const BASEGAME = '@BASEGAME@';
 const EMSCRIPTEN_PRELOAD_FILE = '@EMSCRIPTEN_PRELOAD_FILE@' === 'ON';
-const DEMOPLAYER = @DEMOPLAYER_JS@;
 
 const CACHE_NAME = `${CLIENT_NAME}-assets-v1`;
 const cacheAvailable = typeof caches !== 'undefined';
 
-async function cachedFetch(url, label, statusEl) {
+function authHeaders(url, authToken) {
+    if (!authToken) return {};
+    try { if (new URL(url).origin !== location.origin) return {}; } catch {}
+    return { 'Authorization': `Bearer ${authToken}` };
+}
+
+async function cachedFetch(url, label, statusEl, authToken) {
+    const auth = authHeaders(url, authToken);
     if (cacheAvailable) {
         try {
             const cache = await caches.open(CACHE_NAME);
             const cached = await cache.match(url);
             if (cached) {
-                const headers = {};
+                const headers = { ...auth };
                 const lastModified = cached.headers.get('Last-Modified');
                 const etag = cached.headers.get('ETag');
                 if (lastModified) headers['If-Modified-Since'] = lastModified;
@@ -41,7 +47,7 @@ async function cachedFetch(url, label, statusEl) {
                     return cached;
                 }
             }
-            const response = await fetch(url);
+            const response = await fetch(url, { headers: auth });
             if (response.ok) {
                 cache.put(url, response.clone()).catch(() => {});
             }
@@ -50,24 +56,26 @@ async function cachedFetch(url, label, statusEl) {
             // Cache API unavailable (e.g. non-secure context), fall through
         }
     }
-    return fetch(url);
+    return fetch(url, { headers: auth });
 }
 
 /**
- * Load and run the Trinity demo player engine.
+ * Load and run the Trinity engine.
  *
  * @param {Object} opts
  * @param {HTMLCanvasElement} opts.canvas - Target canvas element
  * @param {HTMLElement} opts.statusEl - Element for status messages
- * @param {string} opts.enginePath - Path to engine .js/.wasm files (e.g. '/demo/')
- * @param {string} opts.demoUrl - URL of the .tvd demo file
+ * @param {string} opts.enginePath - Path to engine .js/.wasm files (e.g. '/engine/')
+ * @param {string} [opts.configUrl] - URL to config JSON (defaults to enginePath + CLIENT_NAME-config.json)
+ * @param {string} [opts.demoUrl] - URL of the .tvd demo file
  * @param {string[]} [opts.extraPk3s] - Additional pk3 URLs to load
  * @param {string} [opts.extraArgs] - Additional engine command-line arguments
+ * @param {string} [opts.authToken] - Bearer token for authenticated asset fetches
  * @param {function} [opts.onProgress] - Progress callback(loaded, total)
  * @param {function} [opts.onReady] - Called once after the first rendered frame
  * @returns {Promise<Object>} The Emscripten Module instance
  */
-export async function loadDemo({ canvas, statusEl, enginePath, demoUrl, extraPk3s = [], extraArgs = '', onProgress, onReady }) {
+export async function loadEngine({ canvas, statusEl, enginePath, configUrl, demoUrl, extraPk3s = [], extraArgs = '', authToken, onProgress, onReady }) {
     if (window.location.protocol === 'file:') {
         throw new Error('Browser security restrictions prevent loading wasm from a file: URL. Serve this file via a web server.');
     }
@@ -77,7 +85,7 @@ export async function loadDemo({ canvas, statusEl, enginePath, demoUrl, extraPk3
     const fs_basegame = BASEGAME;
     let fs_game = '';
 
-    const configFilename = enginePath + `${CLIENT_NAME}-config.json`;
+    const configFilename = configUrl || (enginePath + `${CLIENT_NAME}-config.json`);
     const dataURL = new URL('/', location.origin);
 
     let generatedArguments = `
@@ -228,7 +236,7 @@ export async function loadDemo({ canvas, statusEl, enginePath, demoUrl, extraPk3
                         const fetches = urls.map((url, i) => {
                             const name = files[i].src.match(/[^/]+$/)[0];
                             statusEl.textContent = `Loading ${name}...`;
-                            return cachedFetch(url, `Loading ${name}`, statusEl);
+                            return cachedFetch(url, `Loading ${name}`, statusEl, authToken);
                         });
                         for (let i = 0; i < files.length; i++) {
                             const name = files[i].src.match(/[^/]+$/)[0];
@@ -249,7 +257,7 @@ export async function loadDemo({ canvas, statusEl, enginePath, demoUrl, extraPk3
                         const pk3Urls = extraPk3s.map(url => new URL(url, window.location.href).href);
                         const pk3Fetches = pk3Urls.map((url, i) => {
                             const name = url.split('/').pop();
-                            return cachedFetch(url, `Loading ${name}`, statusEl);
+                            return cachedFetch(url, `Loading ${name}`, statusEl, authToken);
                         });
                         for (let i = 0; i < extraPk3s.length; i++) {
                             const filename = pk3Urls[i].split('/').pop();
@@ -271,7 +279,7 @@ export async function loadDemo({ canvas, statusEl, enginePath, demoUrl, extraPk3
                     if (demoMapName) {
                         const mapPk3Url = new URL(`demopk3s/maps/${demoMapName.toLowerCase()}.pk3`, dataURL).href;
                         statusEl.textContent = `Loading ${demoMapName} map...`;
-                        const mapResp = await cachedFetch(mapPk3Url, `Loading ${demoMapName} map`, statusEl);
+                        const mapResp = await cachedFetch(mapPk3Url, `Loading ${demoMapName} map`, statusEl, authToken);
                         if (mapResp.ok) {
                             const mapData = await mapResp.arrayBuffer();
                             mod.FS.mkdirTree(`/${fs_basegame}`);
@@ -296,7 +304,6 @@ export async function loadDemo({ canvas, statusEl, enginePath, demoUrl, extraPk3
                             autoexec += `set ${name} "${value}"\n`;
                     }
                     if (config.binds) {
-                        if (DEMOPLAYER) autoexec += 'unbindall\n';
                         for (const [key, cmd] of Object.entries(config.binds))
                             autoexec += `bind ${key} "${cmd}"\n`;
                     }

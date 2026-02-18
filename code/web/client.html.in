@@ -1,5 +1,5 @@
 <!DOCTYPE html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>@CLIENT_NAME@ TV Demo Player</title>
+<title>@CLIENT_NAME@</title>
 <style>
 html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: rgb(0, 0, 0); display:flex; align-items: center; justify-content: center; }
 canvas { max-width: 100%; max-height: 100%; min-width: 100%; min-height: 100%; object-fit: contain; }
@@ -21,19 +21,18 @@ document.addEventListener('pointerlockchange', () => {
 </script>
 
 <script type=module>
-import { loadDemo } from './demo-loader.js';
+import { loadEngine } from './loader.js';
 
-const DEMOPLAYER = @DEMOPLAYER_JS@;
 const urlParams = new URLSearchParams(window.location.search);
 
-// Demo URL: from path for demoplayer (/demo/uuid), from query param otherwise (?demo=url)
+// Demo URL: from query param (?demo=url) or path (/demo/uuid)
 let demoUrl = urlParams.get('demo');
-if (!demoUrl && DEMOPLAYER) {
+if (!demoUrl) {
     const pathMatch = window.location.pathname.match(/\/demo\/([0-9a-f-]+)/);
     if (pathMatch) demoUrl = `/demos/${pathMatch[1]}.tvd`;
 }
 
-loadDemo({
+loadEngine({
     canvas: document.getElementById('canvas'),
     statusEl: document.getElementById('status'),
     enginePath: './',

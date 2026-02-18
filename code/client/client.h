@@ -490,6 +490,9 @@ extern	cvar_t	*cl_tvdOffer;
 extern	cvar_t	*cl_voteYesKey;
 extern	cvar_t	*cl_voteNoKey;
 #endif
+#ifdef __EMSCRIPTEN__
+extern	cvar_t	*cl_demoPlayer;
+#endif
 extern	cvar_t	*cl_conXOffset;
 extern	cvar_t	*cl_conColor;
 extern	cvar_t	*cl_inGameVideo;

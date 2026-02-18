@@ -70,6 +70,9 @@ cvar_t	*cl_guidServerUniq;
 cvar_t	*cl_dlURL;
 cvar_t	*cl_dlDirectory;
 cvar_t	*cl_tvDownload;
+#ifdef __EMSCRIPTEN__
+cvar_t	*cl_demoPlayer;
+#endif
 cvar_t	*cl_tvdOffer;
 cvar_t	*cl_voteYesKey;
 cvar_t	*cl_voteNoKey;
@@ -695,8 +698,10 @@ static void CL_DemoCompleted( void ) {
 		}
 	}
 
-#ifdef DEMOPLAYER
-	Com_Quit_f();
+#ifdef __EMSCRIPTEN__
+	if ( cl_demoPlayer->integer ) {
+		Com_Quit_f();
+	}
 #endif
 	CL_Disconnect( qtrue );
 	CL_NextDemo();
@@ -4137,6 +4142,11 @@ void CL_Init( void ) {
 
 	cl_tvDownload = Cvar_Get( "cl_tvDownload", "0", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( cl_tvDownload, "Download TV demo recordings from server via HTTP at end of match.\n 0 - off\n 1 - prompt (auto-decline)\n 2 - prompt (auto-accept)" );
+
+#ifdef __EMSCRIPTEN__
+	cl_demoPlayer = Cvar_Get( "cl_demoPlayer", "0", CVAR_INIT );
+	Cvar_SetDescription( cl_demoPlayer, "Lock engine into demo player mode (disables console, escape, quits on demo end, unbinds all keys). Can only be set at startup." );
+#endif
 
 	cl_tvdOffer = Cvar_Get( "cl_tvdOffer", "", CVAR_ROM );
 	cl_voteYesKey = Cvar_Get( "cl_voteYesKey", "", CVAR_ROM );
