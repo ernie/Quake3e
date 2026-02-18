@@ -15,8 +15,31 @@ async function cachedFetch(url, label, statusEl) {
             const cache = await caches.open(CACHE_NAME);
             const cached = await cache.match(url);
             if (cached) {
-                if (label && statusEl) statusEl.textContent = `${label} (cached)`;
-                return cached;
+                const headers = {};
+                const lastModified = cached.headers.get('Last-Modified');
+                const etag = cached.headers.get('ETag');
+                if (lastModified) headers['If-Modified-Since'] = lastModified;
+                if (etag) headers['If-None-Match'] = etag;
+                if (!lastModified && !etag) {
+                    if (label && statusEl) statusEl.textContent = `${label} (cached)`;
+                    return cached;
+                }
+                try {
+                    const response = await fetch(url, { headers });
+                    if (response.status === 304) {
+                        if (label && statusEl) statusEl.textContent = `${label} (cached)`;
+                        return cached;
+                    }
+                    if (response.ok) {
+                        cache.put(url, response.clone()).catch(() => {});
+                        if (label && statusEl) statusEl.textContent = `${label} (updated)`;
+                        return response;
+                    }
+                    return cached;
+                } catch (e) {
+                    if (label && statusEl) statusEl.textContent = `${label} (cached)`;
+                    return cached;
+                }
             }
             const response = await fetch(url);
             if (response.ok) {
@@ -135,6 +158,23 @@ export async function loadDemo({ canvas, statusEl, enginePath, demoUrl, extraPk3
     }
     document.addEventListener('click', resumeAudio, true);
     document.addEventListener('touchstart', resumeAudio, true);
+
+    // Suppress the click that captures pointer lock so it doesn't reach the game
+    // (prevents inadvertently changing follow target in demo playback)
+    let gobbleMouseUp = false;
+    canvas.addEventListener('mousedown', (e) => {
+        if (!document.pointerLockElement) {
+            e.stopImmediatePropagation();
+            canvas.requestPointerLock();
+            gobbleMouseUp = true;
+        }
+    }, true);
+    canvas.addEventListener('mouseup', (e) => {
+        if (gobbleMouseUp) {
+            e.stopImmediatePropagation();
+            gobbleMouseUp = false;
+        }
+    }, true);
 
     TrinityEngine({
         canvas: canvas,
