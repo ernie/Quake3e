@@ -238,6 +238,20 @@ static void CL_ConfigstringModified( void ) {
 		// parse serverId and other cvars
 		CL_SystemInfoChanged( qfalse );
 	}
+
+	// resolve vote key bindings for cgame display when any vote starts
+	if ( index == CS_VOTE_TIME
+		|| index == CS_TEAMVOTE_TIME
+		|| index == CS_TEAMVOTE_TIME + 1 ) {
+		int keynum;
+		const char *name;
+		keynum = Key_GetKey( "vote yes" );
+		name = keynum >= 0 ? Key_KeynumToString( keynum ) : NULL;
+		Cvar_Set( "cl_voteYesKey", name && name[0] ? name : "" );
+		keynum = Key_GetKey( "vote no" );
+		name = keynum >= 0 ? Key_KeynumToString( keynum ) : NULL;
+		Cvar_Set( "cl_voteNoKey", name && name[0] ? name : "" );
+	}
 }
 
 
