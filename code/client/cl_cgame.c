@@ -92,10 +92,6 @@ CL_GetCurrentSnapshotNumber
 ====================
 */
 static void CL_GetCurrentSnapshotNumber( int *snapshotNumber, int *serverTime ) {
-	if ( tvPlay.active ) {
-		CL_TV_GetCurrentSnapshotNumber( snapshotNumber, serverTime );
-		return;
-	}
 	*snapshotNumber = cl.snap.messageNum;
 	*serverTime = cl.snap.serverTime;
 }
@@ -109,10 +105,6 @@ CL_GetSnapshot
 static qboolean CL_GetSnapshot( int snapshotNumber, snapshot_t *snapshot ) {
 	clSnapshot_t	*clSnap;
 	int				i, count;
-
-	if ( tvPlay.active ) {
-		return CL_TV_GetSnapshot( snapshotNumber, snapshot );
-	}
 
 	if ( cl.snap.messageNum - snapshotNumber < 0 ) {
 		Com_Error( ERR_DROP, "CL_GetSnapshot: snapshotNumber (%i) > cl.snapshot.messageNum (%i)", snapshotNumber, cl.snap.messageNum );
@@ -191,6 +183,7 @@ static void CL_ConfigstringModified( void ) {
 	const char	*dup;
 	gameState_t	oldGs;
 	int			len;
+	char		tvInfo[BIG_INFO_STRING];
 
 	index = atoi( Cmd_Argv(1) );
 	if ( (unsigned) index >= MAX_CONFIGSTRINGS ) {
@@ -198,6 +191,14 @@ static void CL_ConfigstringModified( void ) {
 	}
 	// get everything after "cs <num>"
 	s = Cmd_ArgsFrom(2);
+
+	// During TVD playback, ensure \tv\1 is always present in CS_SERVERINFO
+	// so cgame continues to detect TV mode regardless of the raw data
+	if ( tvPlay.active && index == CS_SERVERINFO && s[0] ) {
+		Q_strncpyz( tvInfo, s, sizeof( tvInfo ) );
+		Info_SetValueForKey( tvInfo, "tv", "1" );
+		s = tvInfo;
+	}
 
 	old = cl.gameState.stringData + cl.gameState.stringOffsets[ index ];
 	if ( !strcmp( old, s ) ) {
@@ -268,10 +269,6 @@ static qboolean CL_GetServerCommand( int serverCommandNumber ) {
 	static char bigConfigString[BIG_INFO_STRING];
 	int argc, index;
 
-	if ( tvPlay.active ) {
-		return CL_TV_GetServerCommand( serverCommandNumber );
-	}
-
 	// if we have irretrievably lost a reliable command, drop the connection
 	if ( clc.serverCommandSequence - serverCommandNumber >= MAX_RELIABLE_COMMANDS ) {
 		// when a demo record was started after the client got a whole bunch of
@@ -306,6 +303,11 @@ rescan:
 	argc = Cmd_Argc();
 
 	if ( !strcmp( cmd, "disconnect" ) ) {
+		// Ignore disconnect commands during demo/TVD playback
+		if ( clc.demoplaying ) {
+			Cmd_Clear();
+			return qfalse;
+		}
 		// https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=552
 		// allow server to indicate why they were disconnected
 		if ( argc >= 2 )
@@ -1198,6 +1200,14 @@ void CL_SetCGameTime( void ) {
 	}
 	cl.oldFrameServerTime = cl.snap.serverTime;
 
+	// TVD at end: freeze time on last frame so nothing advances
+	if ( tvPlay.active && tvPlay.atEnd ) {
+		cl.serverTime = cl.snap.serverTime;
+		Cvar_SetIntegerValue( "cl_tvTime",
+			tvPlay.serverTime - tvPlay.firstServerTime );
+		return;
+	}
+
 	// get our current view of time
 	demoFreezed = clc.demoplaying && com_timescale->value == 0.0f;
 	if ( demoFreezed ) {
@@ -1255,26 +1265,14 @@ void CL_SetCGameTime( void ) {
 
 	if ( tvPlay.active ) {
 		// Advance TV frames while cl.serverTime is ahead of latest snapshot
-		while ( cl.serverTime - tvPlay.snapshots[1].serverTime >= 0 ) {
-			if ( tvPlay.atEnd ) {
-#ifdef __EMSCRIPTEN__
-				if ( cl_demoPlayer->integer ) {
-					Com_Quit_f();
-				}
-#endif
-				CL_Disconnect( qtrue );
-				return;
-			}
-			// Shift: snap[0] = snap[1]
-			tvPlay.snapshots[0] = tvPlay.snapshots[1];
-			Com_Memcpy( tvPlay.snapEntities[0], tvPlay.snapEntities[1],
-				sizeof( tvPlay.snapEntities[0] ) );
-			// Read next frame and build new snap[1]
+		while ( cl.serverTime - cl.snap.serverTime >= 0 ) {
 			CL_TV_ReadFrame();
-			CL_TV_BuildSnapshot( 1 );
+			if ( tvPlay.atEnd ) {
+				break;
+			}
+			CL_TV_BuildSnapshot();
 		}
-		cl.snap = tvPlay.snapshots[1];
-		cl.newSnapshots = qtrue;
+		// cl.snap and cl.newSnapshots are already set by CL_TV_BuildSnapshot()
 		Cvar_SetIntegerValue( "cl_tvTime",
 			tvPlay.serverTime - tvPlay.firstServerTime );
 		return;

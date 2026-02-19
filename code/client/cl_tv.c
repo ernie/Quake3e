@@ -38,6 +38,22 @@ static void CL_TV_ViewNext_f( void );
 static void CL_TV_ViewPrev_f( void );
 static void CL_TV_Seek_f( void );
 
+
+/*
+===============
+CL_TV_WriteCommand
+
+Write a server command into the standard reliable command ring buffer.
+===============
+*/
+static void CL_TV_WriteCommand( const char *cmd ) {
+	int index;
+	clc.serverCommandSequence++;
+	index = clc.serverCommandSequence & ( MAX_RELIABLE_COMMANDS - 1 );
+	Q_strncpyz( clc.serverCommands[index], cmd, MAX_STRING_CHARS );
+	clc.serverCommandsIgnore[index] = qfalse;
+}
+
 // Read team from configstring rather than persistant[], which is unreliable
 // for spectators in follow mode.
 static int CL_TV_GetPlayerTeam( int clientNum ) {
@@ -467,10 +483,16 @@ qboolean CL_TV_Open( const char *filename ) {
 	Com_Memset( tvPlay.players, 0, sizeof( tvPlay.players ) );
 	Com_Memset( tvPlay.playerBitmask, 0, sizeof( tvPlay.playerBitmask ) );
 
+	// Initialize standard ring buffer state
+	cl.parseEntitiesNum = 0;
+	clc.serverMessageSequence = 0;
+	clc.serverCommandSequence = 0;
+	clc.lastExecutedServerCommand = 0;
+
 	// Set initial clientNum
 	clc.clientNum = 0;
 
-	// Read first frame and build snapshots[0]
+	// Read first frame
 	CL_TV_ReadFrame();
 	if ( tvPlay.atEnd ) {
 		Com_Printf( S_COLOR_YELLOW "TV: No frames in file\n" );
@@ -488,30 +510,23 @@ qboolean CL_TV_Open( const char *filename ) {
 	clc.clientNum = tvPlay.viewpoint;
 	VectorCopy( tvPlay.players[tvPlay.viewpoint].origin, tvPlay.viewOrigin );
 
-	CL_TV_BuildSnapshot( 0 );
+	// Build first snapshot into standard ring buffer
+	CL_TV_BuildSnapshot();
 
-	// Read second frame and build snapshots[1]
+	// Read second frame and build second snapshot
 	CL_TV_ReadFrame();
 	if ( tvPlay.atEnd ) {
-		// Only one frame - duplicate
-		tvPlay.snapshots[1] = tvPlay.snapshots[0];
-		tvPlay.snapshots[1].messageNum = tvPlay.snapCount++;
-		Com_Memcpy( tvPlay.snapEntities[1], tvPlay.snapEntities[0],
-			sizeof( tvPlay.snapEntities[0] ) );
+		// Only one frame - build duplicate snapshot with same data
+		CL_TV_BuildSnapshot();
 	} else {
-		CL_TV_BuildSnapshot( 1 );
+		CL_TV_BuildSnapshot();
 	}
 
 	tvPlay.active = qtrue;
 
-	// Set cl.snap so CA_PRIMED -> CA_ACTIVE transition works
-	cl.snap = tvPlay.snapshots[1];
-	cl.newSnapshots = qtrue;
-
-	// Set up server message/command sequences for cgame init
-	clc.serverMessageSequence = tvPlay.snapshots[1].messageNum;
-	clc.lastExecutedServerCommand = tvPlay.cmdSequence;
-	clc.serverCommandSequence = tvPlay.cmdSequence;
+	// cl.snap and cl.newSnapshots are already set by CL_TV_BuildSnapshot()
+	// Set up command sequence for cgame init
+	clc.lastExecutedServerCommand = clc.serverCommandSequence;
 
 	// Register commands
 	Cmd_AddCommand( "tv_view", CL_TV_View_f );
@@ -712,11 +727,8 @@ void CL_TV_ReadFrame( void ) {
 			// Skip during seek (tv_seek_sync handles bulk re-registration)
 			if ( !tvPlay.seeking ) {
 				char csCmd[MAX_STRING_CHARS];
-				int cmdIdx;
 				Com_sprintf( csCmd, sizeof( csCmd ), "cs %i \"%s\"", csIndex, csData );
-				cmdIdx = tvPlay.cmdSequence & ( MAX_RELIABLE_COMMANDS - 1 );
-				Q_strncpyz( tvPlay.cmds[cmdIdx], csCmd, MAX_STRING_CHARS );
-				tvPlay.cmdSequence++;
+				CL_TV_WriteCommand( csCmd );
 			}
 		}
 	}
@@ -738,9 +750,7 @@ void CL_TV_ReadFrame( void ) {
 		// Queue if broadcast (255) or targeted at our viewpoint
 		// Skip during seek to avoid overflowing the 64-command buffer
 		if ( !tvPlay.seeking && ( target == 255 || target == tvPlay.viewpoint ) ) {
-			int idx = tvPlay.cmdSequence & ( MAX_RELIABLE_COMMANDS - 1 );
-			Q_strncpyz( tvPlay.cmds[idx], csData, MAX_STRING_CHARS );
-			tvPlay.cmdSequence++;
+			CL_TV_WriteCommand( csData );
 		}
 	}
 
@@ -775,7 +785,7 @@ so cgame's scoreboard always has up-to-date information.
 
 static void CL_TV_InjectScores( void ) {
 	char buf[MAX_STRING_CHARS];
-	int len, count, i, idx;
+	int len, count, i;
 	playerState_t *ps;
 	int perfect, powerups;
 
@@ -818,9 +828,7 @@ static void CL_TV_InjectScores( void ) {
 			ps->persistant[TV_PERS_CAPTURES] );
 	}
 
-	idx = tvPlay.cmdSequence & ( MAX_RELIABLE_COMMANDS - 1 );
-	Q_strncpyz( tvPlay.cmds[idx], buf, MAX_STRING_CHARS );
-	tvPlay.cmdSequence++;
+	CL_TV_WriteCommand( buf );
 }
 
 
@@ -867,23 +875,25 @@ static int TV_EntDistCompare( const void *a, const void *b ) {
 	return 0;
 }
 
-void CL_TV_BuildSnapshot( int which ) {
+void CL_TV_BuildSnapshot( void ) {
 	clSnapshot_t *snap;
-	int count, i, total;
+	int count, i, total, msgNum;
 
 	// Inject synthetic scores so cgame scoreboard is always current
 	CL_TV_InjectScores();
 
-	snap = &tvPlay.snapshots[which];
+	// Advance message sequence and write into standard ring buffer
+	msgNum = ++clc.serverMessageSequence;
+	snap = &cl.snapshots[msgNum & PACKET_MASK];
 	Com_Memset( snap, 0, sizeof( *snap ) );
 
 	snap->valid = qtrue;
 	snap->serverTime = tvPlay.serverTime;
-	snap->messageNum = tvPlay.snapCount++;
-	snap->deltaNum = snap->messageNum - 1;
+	snap->messageNum = msgNum;
+	snap->deltaNum = msgNum - 1;
 	snap->snapFlags = 0;
 	snap->ping = 0;
-	snap->serverCommandNum = tvPlay.cmdSequence;
+	snap->serverCommandNum = clc.serverCommandSequence;
 
 	// All areas visible (0 = visible, 1 = blocked)
 	snap->areabytes = MAX_MAP_AREA_BYTES;
@@ -892,6 +902,9 @@ void CL_TV_BuildSnapshot( int which ) {
 	// Player state from followed viewpoint
 	snap->ps = tvPlay.players[tvPlay.viewpoint];
 	snap->ps.clientNum = tvPlay.viewpoint;
+
+	// Mark entity start position in standard circular buffer
+	snap->parseEntitiesNum = cl.parseEntitiesNum;
 
 	// Count active entities (excluding viewpoint and filtered events)
 	total = 0;
@@ -915,7 +928,9 @@ void CL_TV_BuildSnapshot( int which ) {
 				continue;
 			if ( CL_TV_SkipEventEntity( &tvPlay.entities[i] ) )
 				continue;
-			tvPlay.snapEntities[which][count] = tvPlay.entities[i];
+			cl.parseEntities[cl.parseEntitiesNum & (MAX_PARSE_ENTITIES-1)] =
+				tvPlay.entities[i];
+			cl.parseEntitiesNum++;
 			count++;
 		}
 	} else {
@@ -940,145 +955,17 @@ void CL_TV_BuildSnapshot( int which ) {
 
 		count = ( n < MAX_ENTITIES_IN_SNAPSHOT ) ? n : MAX_ENTITIES_IN_SNAPSHOT;
 		for ( i = 0; i < count; i++ ) {
-			tvPlay.snapEntities[which][i] =
+			cl.parseEntities[cl.parseEntitiesNum & (MAX_PARSE_ENTITIES-1)] =
 				tvPlay.entities[candidates[i].entityNum];
+			cl.parseEntitiesNum++;
 		}
 	}
 
 	snap->numEntities = count;
-	snap->parseEntitiesNum = which * MAX_ENTITIES_IN_SNAPSHOT;
-}
 
-
-/*
-===============
-CL_TV_GetSnapshot
-===============
-*/
-qboolean CL_TV_GetSnapshot( int snapshotNumber, snapshot_t *snapshot ) {
-	clSnapshot_t *clSnap;
-	int idx, i;
-
-	if ( snapshotNumber == tvPlay.snapshots[0].messageNum ) {
-		idx = 0;
-	} else if ( snapshotNumber == tvPlay.snapshots[1].messageNum ) {
-		idx = 1;
-	} else {
-		return qfalse;
-	}
-
-	clSnap = &tvPlay.snapshots[idx];
-	if ( !clSnap->valid ) {
-		return qfalse;
-	}
-
-	snapshot->snapFlags = clSnap->snapFlags;
-	snapshot->serverCommandSequence = clSnap->serverCommandNum;
-	snapshot->ping = clSnap->ping;
-	snapshot->serverTime = clSnap->serverTime;
-	Com_Memcpy( snapshot->areamask, clSnap->areamask, sizeof( snapshot->areamask ) );
-	snapshot->ps = clSnap->ps;
-
-	snapshot->numEntities = clSnap->numEntities;
-	for ( i = 0; i < clSnap->numEntities; i++ ) {
-		snapshot->entities[i] = tvPlay.snapEntities[idx][i];
-	}
-
-	return qtrue;
-}
-
-
-/*
-===============
-CL_TV_GetCurrentSnapshotNumber
-===============
-*/
-void CL_TV_GetCurrentSnapshotNumber( int *snapshotNumber, int *serverTime ) {
-	*snapshotNumber = tvPlay.snapshots[1].messageNum;
-	*serverTime = tvPlay.snapshots[1].serverTime;
-}
-
-
-/*
-===============
-CL_TV_GetServerCommand
-===============
-*/
-qboolean CL_TV_GetServerCommand( int serverCommandNumber ) {
-	const char *s;
-	const char *cmd;
-	static char bigConfigString[BIG_INFO_STRING];
-	int index;
-
-	if ( tvPlay.cmdSequence - serverCommandNumber >= MAX_RELIABLE_COMMANDS ) {
-		Cmd_Clear();
-		return qfalse;
-	}
-
-	if ( tvPlay.cmdSequence - serverCommandNumber < 0 ) {
-		Com_Error( ERR_DROP, "CL_TV_GetServerCommand: requested a command not received" );
-		return qfalse;
-	}
-
-	index = serverCommandNumber & ( MAX_RELIABLE_COMMANDS - 1 );
-	s = tvPlay.cmds[index];
-	clc.lastExecutedServerCommand = serverCommandNumber;
-
-rescan:
-	Cmd_TokenizeString( s );
-	cmd = Cmd_Argv( 0 );
-
-	if ( !strcmp( cmd, "disconnect" ) ) {
-		// Ignore disconnect commands during TV demo playback
-		Cmd_Clear();
-		return qfalse;
-	}
-
-	if ( !strcmp( cmd, "bcs0" ) ) {
-		Com_sprintf( bigConfigString, BIG_INFO_STRING, "cs %s \"%s", Cmd_Argv(1), Cmd_Argv(2) );
-		return qfalse;
-	}
-
-	if ( !strcmp( cmd, "bcs1" ) ) {
-		s = Cmd_Argv(2);
-		if ( strlen( bigConfigString ) + strlen( s ) >= BIG_INFO_STRING ) {
-			Com_Error( ERR_DROP, "bcs exceeded BIG_INFO_STRING" );
-		}
-		strcat( bigConfigString, s );
-		return qfalse;
-	}
-
-	if ( !strcmp( cmd, "bcs2" ) ) {
-		s = Cmd_Argv(2);
-		if ( strlen( bigConfigString ) + strlen( s ) + 1 >= BIG_INFO_STRING ) {
-			Com_Error( ERR_DROP, "bcs exceeded BIG_INFO_STRING" );
-		}
-		strcat( bigConfigString, s );
-		strcat( bigConfigString, "\"" );
-		s = bigConfigString;
-		goto rescan;
-	}
-
-	if ( !strcmp( cmd, "cs" ) ) {
-		// Apply configstring change to cl.gameState
-		int csIndex = atoi( Cmd_Argv(1) );
-		const char *csValue = Cmd_ArgsFrom(2);
-
-		if ( (unsigned)csIndex < MAX_CONFIGSTRINGS ) {
-			CL_TV_UpdateConfigstring( csIndex, csValue, (int)strlen( csValue ) );
-		}
-		// Re-tokenize since UpdateConfigstring may have clobbered it
-		Cmd_TokenizeString( s );
-		return qtrue;
-	}
-
-	if ( !strcmp( cmd, "map_restart" ) ) {
-		Con_ClearNotify();
-		Cmd_TokenizeString( s );
-		return qtrue;
-	}
-
-	return qtrue;
+	// Update cl.snap and signal new snapshot
+	cl.snap = *snap;
+	cl.newSnapshots = qtrue;
 }
 
 
@@ -1088,6 +975,8 @@ CL_TV_Seek
 ===============
 */
 void CL_TV_Seek( int targetTime ) {
+	int prevMsgNum;
+
 	if ( !tvPlay.active ) {
 		return;
 	}
@@ -1111,6 +1000,8 @@ void CL_TV_Seek( int targetTime ) {
 
 		tvPlay.seeking = qfalse;
 	} else {
+		int j;
+
 		// Backward seek: full reset required
 
 		// Restore initial gameState (configstrings are delta-encoded from header)
@@ -1124,6 +1015,16 @@ void CL_TV_Seek( int targetTime ) {
 		Com_Memset( tvPlay.playerBitmask, 0, sizeof( tvPlay.playerBitmask ) );
 		tvPlay.serverTime = 0;
 		tvPlay.atEnd = qfalse;
+
+		// Reset entity cursor (snapshot ring keeps incrementing to avoid
+		// cgame's latestSnapshotNum going backward)
+		cl.parseEntitiesNum = 0;
+		clc.lastExecutedServerCommand = clc.serverCommandSequence;
+
+		// Invalidate all snapshot ring buffer entries
+		for ( j = 0; j < PACKET_BACKUP; j++ ) {
+			cl.snapshots[j].valid = qfalse;
+		}
 
 		// Reset zstd decompressor session (without freeing context)
 		ZSTD_DCtx_reset( tvPlay.dstream, ZSTD_reset_session_only );
@@ -1144,36 +1045,43 @@ void CL_TV_Seek( int targetTime ) {
 		tvPlay.seeking = qfalse;
 	}
 
-	// Build both snapshots
-	CL_TV_BuildSnapshot( 0 );
+	// Build both snapshots into standard ring buffer
+	CL_TV_BuildSnapshot();
 
 	if ( !tvPlay.atEnd ) {
 		CL_TV_ReadFrame();
-		CL_TV_BuildSnapshot( 1 );
+		CL_TV_BuildSnapshot();
 	} else {
-		tvPlay.snapshots[1] = tvPlay.snapshots[0];
-		tvPlay.snapshots[1].messageNum = tvPlay.snapCount++;
-		Com_Memcpy( tvPlay.snapEntities[1], tvPlay.snapEntities[0],
-			sizeof( tvPlay.snapEntities[0] ) );
+		// Duplicate: build again with same data but new messageNum
+		CL_TV_BuildSnapshot();
 	}
 
 	// Inject sync command so cgame re-fetches gamestate
 	{
-		int idx = tvPlay.cmdSequence & ( MAX_RELIABLE_COMMANDS - 1 );
-		Com_sprintf( tvPlay.cmds[idx], MAX_STRING_CHARS, "tv_seek_sync %i",
+		char syncCmd[MAX_STRING_CHARS];
+		Com_sprintf( syncCmd, sizeof( syncCmd ), "tv_seek_sync %i",
 			tvPlay.viewpoint );
-		tvPlay.cmdSequence++;
+		CL_TV_WriteCommand( syncCmd );
 	}
 
-	// Update snapshot serverCommandNum to include the sync command
-	tvPlay.snapshots[1].serverCommandNum = tvPlay.cmdSequence;
+	// Update the latest snapshot's serverCommandNum to include the sync command
+	cl.snapshots[clc.serverMessageSequence & PACKET_MASK].serverCommandNum =
+		clc.serverCommandSequence;
 
 	// Update client state
-	cl.snap = tvPlay.snapshots[1];
+	cl.snap = cl.snapshots[clc.serverMessageSequence & PACKET_MASK];
 	cl.newSnapshots = qtrue;
-	cl.serverTimeDelta = tvPlay.snapshots[1].serverTime - cls.realtime;
-	cl.oldServerTime = tvPlay.snapshots[0].serverTime;
-	cl.oldFrameServerTime = tvPlay.snapshots[0].serverTime;
+	cl.serverTimeDelta = cl.snap.serverTime - cls.realtime;
+
+	// Find the previous snapshot for oldServerTime/oldFrameServerTime
+	prevMsgNum = clc.serverMessageSequence - 1;
+	if ( prevMsgNum > 0 && cl.snapshots[prevMsgNum & PACKET_MASK].valid ) {
+		cl.oldServerTime = cl.snapshots[prevMsgNum & PACKET_MASK].serverTime;
+		cl.oldFrameServerTime = cl.snapshots[prevMsgNum & PACKET_MASK].serverTime;
+	} else {
+		cl.oldServerTime = cl.snap.serverTime;
+		cl.oldFrameServerTime = cl.snap.serverTime;
+	}
 
 	Cvar_SetIntegerValue( "cl_tvTime",
 		tvPlay.serverTime - tvPlay.firstServerTime );
@@ -1188,22 +1096,17 @@ Rebuild both snapshots after a viewpoint change.
 ===============
 */
 static void CL_TV_RebuildSnapshots( void ) {
-	int savedCount = tvPlay.snapCount;
-
-	// Rebuild both snapshots with new viewpoint
-	tvPlay.snapCount = savedCount - 2;
-	if ( tvPlay.snapCount < 0 ) {
-		tvPlay.snapCount = 0;
+	// Roll back message sequence to rebuild two consecutive snapshots
+	clc.serverMessageSequence -= 2;
+	if ( clc.serverMessageSequence < 0 ) {
+		clc.serverMessageSequence = 0;
 	}
 
-	CL_TV_BuildSnapshot( 0 );
-	CL_TV_BuildSnapshot( 1 );
+	// Rebuild both snapshots with new viewpoint
+	CL_TV_BuildSnapshot();
+	CL_TV_BuildSnapshot();
 
-	// Make messageNums consecutive
-	tvPlay.snapshots[1].messageNum = tvPlay.snapshots[0].messageNum + 1;
-
-	cl.snap = tvPlay.snapshots[1];
-	cl.newSnapshots = qtrue;
+	// cl.snap and cl.newSnapshots are already set by CL_TV_BuildSnapshot()
 
 	clc.clientNum = tvPlay.viewpoint;
 	Cvar_SetIntegerValue( "cl_tvViewpoint", tvPlay.viewpoint );

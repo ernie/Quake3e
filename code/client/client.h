@@ -169,20 +169,10 @@ typedef struct {
 	// Frame tracking
 	int				serverTime;
 
-	// Double-buffered snapshots for cgame interpolation
-	clSnapshot_t	snapshots[2];
-	int				snapCount;
-
-	// Entities for the two snapshots
-	entityState_t	snapEntities[2][MAX_ENTITIES_IN_SNAPSHOT];
-
 	// Viewpoint
 	int				viewpoint;
 	vec3_t			viewOrigin;		// updated by cgame via respatialize trap
 
-	// Server commands for cgame delivery
-	int				cmdSequence;
-	char			cmds[MAX_RELIABLE_COMMANDS][MAX_STRING_CHARS];
 
 	// Read buffer
 	byte			msgBuf[MAX_TV_MSGLEN];
@@ -700,11 +690,8 @@ void CL_TV_Init( void );
 qboolean CL_TV_Open( const char *filename );
 void CL_TV_Close( void );
 void CL_TV_ReadFrame( void );
-void CL_TV_BuildSnapshot( int which );
+void CL_TV_BuildSnapshot( void );
 void CL_TV_Seek( int targetTime );
-qboolean CL_TV_GetSnapshot( int snapshotNumber, snapshot_t *snapshot );
-void CL_TV_GetCurrentSnapshotNumber( int *snapshotNumber, int *serverTime );
-qboolean CL_TV_GetServerCommand( int serverCommandNumber );
 
 // base backend functions
 void	HandleEvents( void );
