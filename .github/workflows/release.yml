@@ -309,23 +309,13 @@ jobs:
       with:
         version: 5.0.1
 
-    - name: Build web client
+    - name: Build web engine
       run: make web
 
-    - name: Build demo player
-      run: make demoplayer
-
     - uses: actions/upload-artifact@v4
       with:
-        name: web-client
-        path: dist/web
-        if-no-files-found: error
-        retention-days: 5
-
-    - uses: actions/upload-artifact@v4
-      with:
-        name: web-demoplayer
-        path: dist/demo
+        name: web-engine
+        path: dist/engine
         if-no-files-found: error
         retention-days: 5
 
@@ -347,8 +337,7 @@ jobs:
           7z a -r trinity-windows-msvc-arm64.zip   ./windows-msvc-arm64/*
           7z a -r trinity-macos-x86_64.zip         ./macos-x86_64/*
           7z a -r trinity-macos-aarch64.zip        ./macos-aarch64/*
-          7z a -r trinity-web-client.zip            ./web-client/*
-          7z a -r trinity-web-demoplayer.zip        ./web-demoplayer/*
+          7z a -r trinity-web-engine.zip             ./web-engine/*
 
       - name: Create release
         uses: softprops/action-gh-release@v2
