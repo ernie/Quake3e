@@ -171,7 +171,7 @@ export async function loadEngine({ canvas, statusEl, enginePath, configUrl, demo
     // (prevents inadvertently changing follow target in demo playback)
     let gobbleMouseUp = false;
     canvas.addEventListener('mousedown', (e) => {
-        if (!document.pointerLockElement) {
+        if (e.button === 0 && !document.pointerLockElement) {
             e.stopImmediatePropagation();
             canvas.requestPointerLock();
             gobbleMouseUp = true;
