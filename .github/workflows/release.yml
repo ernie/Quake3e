@@ -323,8 +323,57 @@ jobs:
     needs: [windows-msys, windows-msys32, windows-msvc, ubuntu-x86, ubuntu-arm64, build-armv7, macos-x86, web]
     runs-on: ubuntu-latest
     steps:
-      - name: Download Artifacts
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: assets/third_party
+
+      - name: Download build artifacts
         uses: actions/download-artifact@v4
+
+      - name: Download Trinity assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p trinity-assets
+          gh release download --repo ernie/trinity --pattern 'pak8t.pk3' --dir trinity-assets
+          gh release download --repo ernie/trinity --pattern 'pak3t.pk3' --dir trinity-assets
+
+      - name: Bundle game data into platform artifacts
+        run: |
+          PLATFORM_DIRS=(
+            linux-x86
+            linux-x86_64
+            linux-arm64
+            linux-armv7
+            windows-mingw-x86
+            windows-mingw-x86_64
+            windows-msvc-arm64
+            macos-x86_64
+            macos-aarch64
+          )
+
+          for dir in "${PLATFORM_DIRS[@]}"; do
+            if [ -d "$dir" ]; then
+              echo "Bundling game data into $dir/"
+
+              # Shareware + point release → baseq3/
+              mkdir -p "$dir/baseq3"
+              cp assets/third_party/demo/pak0.pk3 "$dir/baseq3/"
+              cp assets/third_party/point_release_v1.32/pak*.pk3 "$dir/baseq3/"
+
+              # Trinity assets → baseq3/ and missionpack/
+              mkdir -p "$dir/missionpack"
+              cp trinity-assets/pak8t.pk3 "$dir/baseq3/"
+              cp trinity-assets/pak3t.pk3 "$dir/missionpack/"
+
+              # License files at zip root
+              cp assets/third_party/demo/DEMO_LICENSE.txt "$dir/"
+              cp assets/third_party/point_release_v1.32/Q3A_PR_v132_EULA.txt "$dir/"
+            else
+              echo "Warning: $dir not found, skipping"
+            fi
+          done
 
       - name: Create binary archives
         run: |
@@ -337,7 +386,7 @@ jobs:
           7z a -r trinity-windows-msvc-arm64.zip   ./windows-msvc-arm64/*
           7z a -r trinity-macos-x86_64.zip         ./macos-x86_64/*
           7z a -r trinity-macos-aarch64.zip        ./macos-aarch64/*
-          7z a -r trinity-web-engine.zip             ./web-engine/*
+          7z a -r trinity-web-engine.zip           ./web-engine/*
 
       - name: Create release
         uses: softprops/action-gh-release@v2
