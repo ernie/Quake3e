@@ -1182,7 +1182,6 @@ update cl_guid using QKEY_FILE and optional prefix
 */
 static void CL_UpdateGUID( const char *prefix, int prefix_len )
 {
-#ifdef USE_Q3KEY
 	fileHandle_t f;
 	int len;
 
@@ -1194,9 +1193,6 @@ static void CL_UpdateGUID( const char *prefix, int prefix_len )
 	else
 		Cvar_Set( "cl_guid", Com_MD5File( QKEY_FILE, QKEY_SIZE,
 			prefix, prefix_len ) );
-#else
-	Cvar_Set( "cl_guid", Com_MD5Buf( &cl_cdkey[0], sizeof(cl_cdkey), prefix, prefix_len));
-#endif
 }
 
 
@@ -3800,7 +3796,6 @@ test to see if a valid QKEY_FILE exists.  If one does not, try to generate
 it by filling it with 2048 bytes of random data.
 ===============
 */
-#ifdef USE_Q3KEY
 static void CL_GenerateQKey(void)
 {
 	int len = 0;
@@ -3833,7 +3828,6 @@ static void CL_GenerateQKey(void)
 		Com_Printf( "QKEY generated\n" );
 	}
 }
-#endif
 
 
 /*
@@ -4132,7 +4126,7 @@ void CL_Init( void ) {
 	cl_lanForcePackets = Cvar_Get( "cl_lanForcePackets", "1", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( cl_lanForcePackets, "Bypass \\cl_maxpackets for LAN games, send packets every frame." );
 
-	cl_guidServerUniq = Cvar_Get( "cl_guidServerUniq", "1", CVAR_ARCHIVE_ND );
+	cl_guidServerUniq = Cvar_Get( "cl_guidServerUniq", "0", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( cl_guidServerUniq, "Makes cl_guid unique for each server." );
 
 	cl_dlURL = Cvar_Get( "cl_dlURL", "http://ws.q3df.org/maps/download/%1", CVAR_ARCHIVE_ND );
@@ -4230,9 +4224,7 @@ void CL_Init( void ) {
 	CL_TV_Init();
 
 	Cvar_Set( "cl_running", "1" );
-#ifdef USE_MD5
 	CL_GenerateQKey();
-#endif
 	Cvar_Get( "cl_guid", "", CVAR_USERINFO | CVAR_ROM | CVAR_PROTECTED );
 	CL_UpdateGUID( NULL, 0 );
 
