@@ -44,9 +44,7 @@ jobs:
 
     - name: Build
       run: |
-        make install -j$(nproc) ARCH=${{ matrix.arch }} COMPILE_ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=trinity-vulkan BUILD_SERVER=0
-        make clean ARCH=${{ matrix.arch }}
-        make install -j$(nproc) ARCH=${{ matrix.arch }} COMPILE_ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=opengl
+        make install -j$(nproc) ARCH=${{ matrix.arch }} COMPILE_ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin
 
     - uses: actions/upload-artifact@v4
       with:
@@ -86,9 +84,7 @@ jobs:
     - name: Build
       shell: cmd
       run: |
-        make install ARCH=${{ matrix.arch }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=trinity-vulkan BUILD_SERVER=0
-        make clean ARCH=${{ matrix.arch }}
-        make install ARCH=${{ matrix.arch }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=opengl
+        make install ARCH=${{ matrix.arch }} DESTDIR=bin
 
     - uses: actions/upload-artifact@v4
       with:
@@ -98,26 +94,8 @@ jobs:
         retention-days: 5
 
   windows-msvc:
-    name: Release Windows-MSVC ${{ matrix.arch }}
+    name: Release Windows-MSVC arm64
     runs-on: windows-2022
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [arm64, x86, x64]
-        include:
-          - arch: arm64
-            platform: ARM64
-            suffix: .arm64
-            pkg_suffix: arm64
-
-          - arch: x86
-            platform: Win32
-            pkg_suffix: x86
-
-          - arch: x64
-            platform: x64
-            suffix: .x64
-            pkg_suffix: x86_64
 
     steps:
 
@@ -131,25 +109,21 @@ jobs:
       run: |
         mkdir bin
 
-        msbuild code\win32\msvc2017\trinity-ded.vcxproj -p:TargetName=trinity.ded,Configuration=Release,Platform=${{ matrix.platform }} /p:PlatformToolset=v143
-        copy code\win32\msvc2017\output\trinity.ded.exe bin\trinity.ded${{ matrix.suffix }}.exe
-        msbuild code\win32\msvc2017\trinity-ded.vcxproj -p:TargetName=trinity.ded,Configuration=Release,Platform=${{ matrix.platform }} -t:Clean
+        msbuild code\win32\msvc2017\trinity-ded.vcxproj -p:TargetName=trinity.ded,Configuration=Release,Platform=ARM64 /p:PlatformToolset=v143
+        copy code\win32\msvc2017\output\trinity.ded.exe bin\trinity.ded.arm64.exe
 
-        msbuild code\win32\msvc2017\renderer.vcxproj -p:Configuration=Release,Platform=${{ matrix.platform }} /p:PlatformToolset=v143
-        msbuild code\win32\msvc2017\trinity.vcxproj -p:TargetName=trinity,Configuration=Release,Platform=${{ matrix.platform }},UseWasapi=USE_WASAPI=0 /p:PlatformToolset=v143
-        copy code\win32\msvc2017\output\trinity.exe bin\trinity${{ matrix.suffix }}.exe
-        msbuild code\win32\msvc2017\renderer.vcxproj -p:Configuration=Release,Platform=${{ matrix.platform }} -t:Clean
-        msbuild code\win32\msvc2017\trinity.vcxproj -p:TargetName=trinity,Configuration=Release,Platform=${{ matrix.platform }},UseWasapi=USE_WASAPI=0 -t:Clean
+        msbuild code\win32\msvc2017\renderer.vcxproj -p:Configuration=Release,Platform=ARM64 /p:PlatformToolset=v143
+        copy code\win32\msvc2017\output\trinity_opengl_arm64.dll bin\
 
-        msbuild code\win32\msvc2017\renderervk.vcxproj -p:Configuration=Release,Platform=${{ matrix.platform }} /p:PlatformToolset=v143
-        msbuild code\win32\msvc2017\trinity.vcxproj -p:TargetName=trinity,Configuration=Release,Platform=${{ matrix.platform }},UseWasapi=USE_WASAPI=0 /p:PlatformToolset=v143
-        copy code\win32\msvc2017\output\trinity.exe bin\trinity-vulkan${{ matrix.suffix }}.exe
-        msbuild code\win32\msvc2017\renderervk.vcxproj -p:Configuration=Release,Platform=${{ matrix.platform }} -t:Clean
-        msbuild code\win32\msvc2017\trinity.vcxproj -p:TargetName=trinity,Configuration=Release,Platform=${{ matrix.platform }},UseWasapi=USE_WASAPI=0 -t:Clean
+        msbuild code\win32\msvc2017\renderervk.vcxproj -p:Configuration=Release,Platform=ARM64 /p:PlatformToolset=v143
+        copy code\win32\msvc2017\output\trinity_vulkan_arm64.dll bin\
+
+        msbuild code\win32\msvc2017\trinity.vcxproj -p:TargetName=trinity,Configuration=Release,Platform=ARM64,UseWasapi=USE_WASAPI=0 /p:PlatformToolset=v143
+        copy code\win32\msvc2017\output\trinity.exe bin\trinity.arm64.exe
 
     - uses: actions/upload-artifact@v4
       with:
-        name: windows-msvc-${{ matrix.pkg_suffix }}
+        name: windows-msvc-arm64
         path: bin
         if-no-files-found: error
         retention-days: 5
@@ -188,9 +162,7 @@ jobs:
 
     - name: Build
       run: |
-        make install -j$(nproc) ARCH=${{ matrix.arch }} COMPILE_ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin ${{ matrix.use_sdl }} USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=trinity-vulkan BUILD_SERVER=0
-        make clean ARCH=${{ matrix.arch }}
-        make install -j$(nproc) ARCH=${{ matrix.arch }} COMPILE_ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin ${{ matrix.use_sdl }} USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=opengl
+        make install -j$(nproc) ARCH=${{ matrix.arch }} COMPILE_ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin ${{ matrix.use_sdl }}
 
     - uses: actions/upload-artifact@v4
       with:
@@ -222,9 +194,7 @@ jobs:
 
     - name: Build
       run: |
-          make install -j$(nproc) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=trinity-vulkan BUILD_SERVER=0
-          make clean ARCH=${{ matrix.arch }}
-          make install -j$(nproc) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin USE_SDL=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=opengl
+          make install -j$(nproc) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin
 
     - uses: actions/upload-artifact@v4
       with:
@@ -283,9 +253,7 @@ jobs:
 
     - name: Build
       run: |
-        make install -j$(sysctl -n hw.logicalcpu) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin INSTALL=ginstall USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan CNAME=trinity-vulkan BUILD_SERVER=0 STRIP=echo
-        make clean ARCH=${{ matrix.arch }}
-        make install -j$(sysctl -n hw.logicalcpu) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin INSTALL=ginstall USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=opengl STRIP=echo
+        make install -j$(sysctl -n hw.logicalcpu) ARCH=${{ matrix.arch }} CC=${{ matrix.cc }} DESTDIR=bin INSTALL=ginstall USE_RENDERER_DLOPEN=1 STRIP=echo
 
     - uses: actions/upload-artifact@v4
       with:
