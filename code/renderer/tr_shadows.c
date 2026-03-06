@@ -44,6 +44,8 @@ typedef struct {
 static	edgeDef_t	edgeDefs[SHADER_MAX_VERTEXES][MAX_EDGE_DEFS];
 static	int			numEdgeDefs[SHADER_MAX_VERTEXES];
 static	int			facing[SHADER_MAX_INDEXES/3];
+static	int			numLitTris;
+static	int			litTriIndexes[SHADER_MAX_INDEXES];
 
 static void R_AddEdgeDef( int i1, int i2, int f ) {
 	int		c;
@@ -138,15 +140,9 @@ void RB_ShadowTessEnd( void ) {
 #endif
 		VectorCopy( backEnd.currentEntity->lightDir, lightDir );
 
-	// clamp projection by height
-	if ( lightDir[2] > 0.1 ) {
-		float s = 0.1 / lightDir[2];
-		VectorScale( lightDir, s, lightDir );
-	}
-
 	// project vertexes away from light direction
 	for ( i = 0; i < tess.numVertexes; i++ ) {
-		VectorMA( tess.xyz[i], -512, lightDir, tess.xyz[i+tess.numVertexes] );
+		VectorMA( tess.xyz[i], -r_shadowDistance->value, lightDir, tess.xyz[i+tess.numVertexes] );
 	}
 
 	// decide which triangles face the light
@@ -184,7 +180,28 @@ void RB_ShadowTessEnd( void ) {
 		R_AddEdgeDef( i3, i1, facing[ i ] );
 	}
 
+	// save lit-facing triangle indices for back cap generation
+	numLitTris = 0;
+	for ( i = 0; i < numTris; i++ ) {
+		if ( facing[i] ) {
+			litTriIndexes[ numLitTris*3 + 0 ] = tess.indexes[ i*3 + 0 ];
+			litTriIndexes[ numLitTris*3 + 1 ] = tess.indexes[ i*3 + 1 ];
+			litTriIndexes[ numLitTris*3 + 2 ] = tess.indexes[ i*3 + 2 ];
+			numLitTris++;
+		}
+	}
+
 	R_CalcShadowEdges();
+
+	// append back cap: lit-facing triangles at extruded positions, reversed winding
+	for ( i = 0; i < numLitTris; i++ ) {
+		if ( tess.numIndexes > ARRAY_LEN( tess.indexes ) - 3 )
+			break;
+		tess.indexes[ tess.numIndexes + 0 ] = litTriIndexes[ i*3 + 0 ] + tess.numVertexes;
+		tess.indexes[ tess.numIndexes + 1 ] = litTriIndexes[ i*3 + 2 ] + tess.numVertexes;
+		tess.indexes[ tess.numIndexes + 2 ] = litTriIndexes[ i*3 + 1 ] + tess.numVertexes;
+		tess.numIndexes += 3;
+	}
 
 	GL_ClientState( 1, CLS_NONE );
 	GL_ClientState( 0, CLS_NONE );
@@ -206,7 +223,8 @@ void RB_ShadowTessEnd( void ) {
 	qglColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE );
 
 	qglEnable( GL_STENCIL_TEST );
-	qglStencilFunc( GL_ALWAYS, 1, 255 );
+	qglStencilFunc( GL_EQUAL, 0, 0x80 );   // skip entity-marked pixels (bit 7 set)
+	qglStencilMask( 0x7F );                 // only write shadow count to bits 0-6
 
 	GL_Cull( CT_BACK_SIDED );
 	qglStencilOp( GL_KEEP, GL_KEEP, GL_INCR );
@@ -220,6 +238,9 @@ void RB_ShadowTessEnd( void ) {
 
 	if ( qglUnlockArraysEXT )
 		qglUnlockArraysEXT();
+
+	qglStencilMask( 0xFF );
+	qglDisable( GL_STENCIL_TEST );
 
 	// re-enable writing to the color buffer
 	qglColorMask(rgba[0], rgba[1], rgba[2], rgba[3]);
@@ -265,20 +286,26 @@ void RB_ShadowFinish( void ) {
 	}
 
 	qglEnable( GL_STENCIL_TEST );
-	qglStencilFunc( GL_NOTEQUAL, 0, 255 );
+	qglStencilFunc( GL_NOTEQUAL, 0, 0x7F );  // check shadow bits 0-6 only
 
 	qglDisable( GL_CLIP_PLANE0 );
 	GL_Cull( CT_TWO_SIDED );
 
 	qglDisable( GL_TEXTURE_2D );
 
+	// override projection to avoid portal oblique near plane clipping
+	qglMatrixMode( GL_PROJECTION );
+	qglPushMatrix();
+	qglLoadIdentity();
+	qglOrtho( -100, 100, -100, 100, -100, 100 );
+	qglMatrixMode( GL_MODELVIEW );
 	qglLoadIdentity();
 
 	qglColor4f( 0.6f, 0.6f, 0.6f, 1 );
-	GL_State( GLS_DEPTHMASK_TRUE | GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO );
+	GL_State( GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO | GLS_DEPTHTEST_DISABLE );
 
 	//qglColor4f( 1, 0, 0, 1 );
-	//GL_State( GLS_DEPTHMASK_TRUE | GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
+	//GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO | GLS_DEPTHTEST_DISABLE );
 
 	GL_ClientState( 0, CLS_NONE );
 	qglVertexPointer( 3, GL_FLOAT, 0, verts );
@@ -286,6 +313,11 @@ void RB_ShadowFinish( void ) {
 
 	qglColor4f( 1, 1, 1, 1 );
 	qglDisable( GL_STENCIL_TEST );
+
+	// restore projection
+	qglMatrixMode( GL_PROJECTION );
+	qglPopMatrix();
+	qglMatrixMode( GL_MODELVIEW );
 
 	qglEnable( GL_TEXTURE_2D );
 }

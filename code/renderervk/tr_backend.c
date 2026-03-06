@@ -619,6 +619,7 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 #endif
 	depthRange = qfalse;
 
+	backEnd.doneShadows = qfalse;
 	backEnd.pc.c_surfaces += numDrawSurfs;
 
 	for (i = 0, drawSurf = drawSurfs ; i < numDrawSurfs ; i++, drawSurf++) {
@@ -661,6 +662,12 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 			}
 			oldShaderSort = shader->sort;
 #endif
+			// composite shadow finish before blended surfaces so sprites draw on top
+			if ( backEnd.doneShadows && shader->sort >= SS_BLEND0 ) {
+				RB_ShadowFinish();
+				oldEntityNum = -1;
+			}
+
 			RB_BeginSurface( shader, fogNum );
 			oldShader = shader;
 		}

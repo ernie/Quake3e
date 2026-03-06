@@ -183,6 +183,7 @@ typedef struct {
 	int fog_stage; // off, fog-in / fog-out
 	int abs_light;
 	int allow_discard;
+	int stencil_mark; // mark entity pixels with stencil bit 0x80
 	int acff; // none, rgb, rgba, alpha
 	struct {
 		byte rgb;
@@ -577,6 +578,7 @@ typedef struct {
 	qboolean wideLines;
 	qboolean samplerAnisotropy;
 	qboolean fragmentStores;
+	qboolean depthClamp;
 	qboolean dedicatedAllocation;
 	qboolean debugMarkers;
 

@@ -128,13 +128,14 @@ typedef enum {
 
 	SS_UNDERWATER,		// for items that should be drawn in front of the water plane
 
-	SS_BLEND0,			// regular transparency and filters
+	SS_STENCIL_SHADOW,	// stencil shadow volumes (before blended surfaces)
+
+	SS_BLEND0 = 17,		// regular transparency and filters
 	SS_BLEND1,			// generally only used for additive type effects
 	SS_BLEND2,
 	SS_BLEND3,
 
 	SS_BLEND6,
-	SS_STENCIL_SHADOW,
 	SS_ALMOST_NEAREST,	// gun smoke puffs
 
 	SS_NEAREST			// blood blobs
@@ -1295,6 +1296,7 @@ extern	cvar_t	*r_shownormals;					// draws wireframe normals
 extern	cvar_t	*r_clear;						// force screen clear every frame
 
 extern	cvar_t	*r_shadows;						// controls shadows: 0 = none, 1 = blur, 2 = stencil, 3 = black planar projection
+extern	cvar_t	*r_shadowDistance;				// shadow volume extrusion distance in game units
 extern	cvar_t	*r_flares;						// light flares
 
 extern	cvar_t	*r_intensity;

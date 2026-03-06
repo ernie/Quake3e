@@ -4,6 +4,45 @@ Trinity Engine is a fork of [Quake3e](https://github.com/ec-/Quake3e) with featu
 
 ## Features beyond Quake3e
 
+### VR Client Support
+
+The engine supports VR clients connecting to flatscreen servers. This involves changes
+on both the server and client sides of the engine:
+
+**Server engine** — Detects VR clients via the `vr` userinfo key and reads 32-bit usercmd
+buttons (instead of 16) for those clients, allowing head orientation data packed into the
+upper bits to pass through to the game mod. Sets `vr_support=1` in serverinfo so VR clients
+know they can send extended data.
+
+**Client engine** — Reads `vr_support` from serverinfo on connect. Flatscreen clients use
+this to display VR player status (e.g., scoreboard icons via configstrings). The VR client
+engines (Q3VR, Quake 3 Quest) use it to decide whether to pack head orientation into usercmds
+and write 32-bit buttons.
+
+The actual head tracking encoding, game logic, and rendering are handled by the
+[Trinity](https://github.com/ernie/trinity) game mod and the VR client engines. See
+[VR_PROTOCOL.md](https://github.com/ernie/trinity/blob/main/docs/VR_PROTOCOL.md) for the
+full protocol specification.
+
+### Improved Stencil Shadows
+
+Stencil shadow volumes (`cg_shadows 2`) have been substantially reworked in both the OpenGL
+and Vulkan renderers:
+
+- **Shadow volume capping** — Back caps are generated for shadow volumes, fixing the "ghost
+  shadow" artifacts that appeared as floating model silhouettes when players jumped
+- **Configurable distance** — `r_shadowDistance` (default 128) replaces the hardcoded 512-unit
+  extrusion, greatly reducing wall bleed
+- **Raw light direction** — Shadow extrusion follows the actual light direction instead of
+  clamping to downward travel, producing correct shadows from all light angles
+- **Draw order** — Shadow compositing happens before blended surfaces, so sprites and
+  transparent effects draw on top of shadows as expected
+- **Entity stencil masking** — Entity pixels are marked in the stencil buffer so shadows
+  don't darken the casting model itself
+
+To use: `cg_shadows 2`, `r_shadowDistance 128`, `cg_playerShadow 0`. Larger `r_shadowDistance`
+values cast farther but increase wall bleed.
+
 ### TV (TrinityVision, of course :wink:) Demo System
 
 Server-side demo recording captures complete match state — all entities, player states,
@@ -35,10 +74,6 @@ and `fs_game`, fetches the appropriate pk3s, and supports browser-side asset cac
 used as a web client or demo player, and embedded into an existing page.
 
 Requires the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) (`emcmake`/`emmake`).
-
-### VR Client Support
-
-The engine detects VR clients via userinfo and extends the network protocol to support 32-bit button states (up from 16), using this space to receive head orientation information so that it's reflected in-game. Servers advertise VR capability to clients via the `vr_support` serverinfo cvar.
 
 ### Server Lifecycle Callbacks
 

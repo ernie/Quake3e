@@ -1142,7 +1142,7 @@ void R_AddIQMSurfaces( trRefEntity_t *ent ) {
 		if ( !personalModel
 			&& r_shadows->integer == 2 
 			&& fogNum == 0
-			&& !(ent->e.renderfx & ( RF_NOSHADOW | RF_DEPTHHACK ) ) 
+			&& !(ent->e.renderfx & ( RF_NOSHADOW | RF_DEPTHHACK | RF_FIRST_PERSON ) )
 			&& shader->sort == SS_OPAQUE ) {
 			R_AddDrawSurf( (void *)surface, tr.shadowShader, 0, 0 );
 		}

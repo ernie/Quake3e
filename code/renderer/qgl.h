@@ -199,6 +199,7 @@ typedef char GLchar;
 	GLE( void, glLoadMatrixf, const GLfloat *m ) \
 	GLE( void, glMatrixMode, GLenum mode ) \
 	GLE( void, glNormalPointer, GLenum type, GLsizei stride, const GLvoid *pointer ) \
+	GLE( void, glOrtho, GLdouble left, GLdouble right, GLdouble bottom, GLdouble top, GLdouble zNear, GLdouble zFar ) \
 	GLE( void, glPolygonMode, GLenum face, GLenum mode ) \
 	GLE( void, glPolygonOffset, GLfloat factor, GLfloat units ) \
 	GLE( void, glPopMatrix, void ) \
@@ -207,6 +208,7 @@ typedef char GLchar;
 	GLE( void, glScissor, GLint x, GLint y, GLsizei width, GLsizei height ) \
 	GLE( void, glShadeModel, GLenum mode ) \
 	GLE( void, glStencilFunc, GLenum func, GLint ref, GLuint mask ) \
+	GLE( void, glStencilMask, GLuint mask ) \
 	GLE( void, glStencilOp, GLenum fail, GLenum zfail, GLenum zpass ) \
 	GLE( void, glTexCoordPointer, GLint size, GLenum type, GLsizei stride, const GLvoid *pointer ) \
 	GLE( void, glTexEnvi, GLenum target, GLenum pname, GLint param ) \

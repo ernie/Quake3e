@@ -523,6 +523,7 @@ static void RB_BeginDrawingView( void ) {
 	if ( r_shadows->integer == 2 )
 	{
 		clearBits |= GL_STENCIL_BUFFER_BIT;
+		qglStencilMask( 0xFF );
 	}
 	if ( 0 && r_fastsky->integer && !( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) )
 	{
@@ -534,6 +535,11 @@ static void RB_BeginDrawingView( void ) {
 #endif
 	}
 	qglClear( clearBits );
+
+	// prevent stencil test from leaking into non-shadow rendering
+	if ( r_shadows->integer == 2 ) {
+		qglDisable( GL_STENCIL_TEST );
+	}
 
 	if ( backEnd.refdef.rdflags & RDF_HYPERSPACE ) {
 		RB_Hyperspace();
@@ -587,6 +593,7 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 #endif
 	depthRange = qfalse;
 
+	backEnd.doneShadows = qfalse;
 	backEnd.pc.c_surfaces += numDrawSurfs;
 
 	for (i = 0, drawSurf = drawSurfs ; i < numDrawSurfs ; i++, drawSurf++) {
@@ -621,6 +628,12 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 			}
 			oldShaderSort = shader->sort;
 #endif
+			// composite shadow finish before blended surfaces so sprites draw on top
+			if ( backEnd.doneShadows && shader->sort >= SS_BLEND0 ) {
+				RB_ShadowFinish();
+				oldEntityNum = -1;
+			}
+
 			RB_BeginSurface( shader, fogNum );
 			oldShader = shader;
 		}
@@ -675,6 +688,20 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 			tess.shaderTime = backEnd.refdef.floatTime - tess.shader->timeOffset;
 
 			qglLoadMatrixf( backEnd.or.modelMatrix );
+
+			// mark entity pixels with stencil bit 0x80
+			if ( r_shadows->integer == 2 ) {
+				if ( entityNum != REFENTITYNUM_WORLD
+					&& backEnd.currentEntity->e.reType == RT_MODEL ) {
+					qglEnable( GL_STENCIL_TEST );
+					qglStencilFunc( GL_ALWAYS, 0x80, 0xFF );
+					qglStencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
+					qglStencilMask( 0x80 );
+				} else {
+					qglDisable( GL_STENCIL_TEST );
+					qglStencilMask( 0xFF );
+				}
+			}
 
 			//
 			// change depthrange. Also change projection matrix so first person weapon does not look like coming
