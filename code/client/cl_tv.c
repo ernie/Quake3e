@@ -1045,7 +1045,16 @@ void CL_TV_Seek( int targetTime ) {
 		tvPlay.seeking = qfalse;
 	}
 
+	// Inject sync command BEFORE building snapshots so both include it
+	{
+		char syncCmd[MAX_STRING_CHARS];
+		Com_sprintf( syncCmd, sizeof( syncCmd ), "tv_seek_sync %i",
+			tvPlay.viewpoint );
+		CL_TV_WriteCommand( syncCmd );
+	}
+
 	// Build both snapshots into standard ring buffer
+	// (both will have serverCommandNum including tv_seek_sync)
 	CL_TV_BuildSnapshot();
 
 	if ( !tvPlay.atEnd ) {
@@ -1055,18 +1064,6 @@ void CL_TV_Seek( int targetTime ) {
 		// Duplicate: build again with same data but new messageNum
 		CL_TV_BuildSnapshot();
 	}
-
-	// Inject sync command so cgame re-fetches gamestate
-	{
-		char syncCmd[MAX_STRING_CHARS];
-		Com_sprintf( syncCmd, sizeof( syncCmd ), "tv_seek_sync %i",
-			tvPlay.viewpoint );
-		CL_TV_WriteCommand( syncCmd );
-	}
-
-	// Update the latest snapshot's serverCommandNum to include the sync command
-	cl.snapshots[clc.serverMessageSequence & PACKET_MASK].serverCommandNum =
-		clc.serverCommandSequence;
 
 	// Update client state
 	cl.snap = cl.snapshots[clc.serverMessageSequence & PACKET_MASK];
@@ -1085,6 +1082,11 @@ void CL_TV_Seek( int targetTime ) {
 
 	Cvar_SetIntegerValue( "cl_tvTime",
 		tvPlay.serverTime - tvPlay.firstServerTime );
+
+	// Snap cl.serverTime to the seek target so the view updates immediately,
+	// even when paused (timescale 0) — the frozen branch of CL_SetCGameTime
+	// never recomputes cl.serverTime, so without this it would stay stale.
+	cl.serverTime = cl.snap.serverTime;
 }
 
 
