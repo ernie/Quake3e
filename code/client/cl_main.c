@@ -4139,7 +4139,7 @@ void CL_Init( void ) {
 		" 1 - basegame (%s) directory\n", FS_GetBaseGameDir() );
 	Cvar_SetDescription( cl_dlDirectory, s );
 
-	cl_tvDownload = Cvar_Get( "cl_tvDownload", "0", CVAR_ARCHIVE_ND );
+	cl_tvDownload = Cvar_Get( "cl_tvDownload", "1", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( cl_tvDownload, "Download TV demo recordings from server via HTTP at end of match.\n 0 - off\n 1 - prompt (auto-decline)\n 2 - prompt (auto-accept)" );
 
 #ifdef __EMSCRIPTEN__
