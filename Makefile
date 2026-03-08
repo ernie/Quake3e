@@ -464,7 +464,7 @@ ifdef MINGW
     else
       CLIENT_LDFLAGS += -L$(MOUNT_DIR)/libcurl/windows/mingw/lib64
     endif
-    CLIENT_LDFLAGS += -lcurl -lz -lcrypt32
+    CLIENT_LDFLAGS += -lcurl -Wl,-Bstatic -lz -Wl,-Bdynamic -lcrypt32
   endif
 
   ifeq ($(USE_OGG_VORBIS),1)
