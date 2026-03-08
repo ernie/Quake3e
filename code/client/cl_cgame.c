@@ -1264,13 +1264,17 @@ void CL_SetCGameTime( void ) {
 	}
 
 	if ( tvPlay.active ) {
-		// Advance TV frames while cl.serverTime is ahead of latest snapshot
-		while ( cl.serverTime - cl.snap.serverTime >= 0 ) {
-			CL_TV_ReadFrame();
-			if ( tvPlay.atEnd ) {
-				break;
+		// Advance TV frames while cl.serverTime is ahead of latest snapshot.
+		// Skip when paused (timescale 0) to prevent frame drift during
+		// viewpoint switches that snap cl.serverTime = cl.snap.serverTime.
+		if ( com_timescale->value != 0.0f ) {
+			while ( cl.serverTime - cl.snap.serverTime >= 0 ) {
+				CL_TV_ReadFrame();
+				if ( tvPlay.atEnd ) {
+					break;
+				}
+				CL_TV_BuildSnapshot();
 			}
-			CL_TV_BuildSnapshot();
 		}
 		// cl.snap and cl.newSnapshots are already set by CL_TV_BuildSnapshot()
 		Cvar_SetIntegerValue( "cl_tvTime",

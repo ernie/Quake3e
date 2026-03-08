@@ -1098,20 +1098,40 @@ Rebuild both snapshots after a viewpoint change.
 ===============
 */
 static void CL_TV_RebuildSnapshots( void ) {
-	// Roll back message sequence to rebuild two consecutive snapshots
-	clc.serverMessageSequence -= 2;
-	if ( clc.serverMessageSequence < 0 ) {
-		clc.serverMessageSequence = 0;
-	}
+	int prevMsgNum;
 
-	// Rebuild both snapshots with new viewpoint
+	// Update viewOrigin so CL_TV_BuildSnapshot culls entities relative
+	// to the new viewpoint, not the old one.
+	VectorCopy( tvPlay.players[tvPlay.viewpoint].origin, tvPlay.viewOrigin );
+
+	// Build two NEW snapshots (no rollback — incrementing sequence so
+	// cgame sees them as genuinely new via trap_GetCurrentSnapshotNumber).
+	// CG_SetNextSnap detects the clientNum change and sets nextFrameTeleport,
+	// and CG_TransitionSnapshot updates cg.clientNum automatically.
 	CL_TV_BuildSnapshot();
 	CL_TV_BuildSnapshot();
-
-	// cl.snap and cl.newSnapshots are already set by CL_TV_BuildSnapshot()
 
 	clc.clientNum = tvPlay.viewpoint;
 	Cvar_SetIntegerValue( "cl_tvViewpoint", tvPlay.viewpoint );
+
+	// Update client timing state so the view updates immediately,
+	// even when paused (timescale 0) — same pattern as CL_TV_Seek.
+	// The frozen branch of CL_SetCGameTime never recomputes
+	// cl.serverTime, so without this it would stay stale.
+	cl.snap = cl.snapshots[clc.serverMessageSequence & PACKET_MASK];
+	cl.newSnapshots = qtrue;
+	cl.serverTimeDelta = cl.snap.serverTime - cls.realtime;
+
+	prevMsgNum = clc.serverMessageSequence - 1;
+	if ( prevMsgNum > 0 && cl.snapshots[prevMsgNum & PACKET_MASK].valid ) {
+		cl.oldServerTime = cl.snapshots[prevMsgNum & PACKET_MASK].serverTime;
+		cl.oldFrameServerTime = cl.snapshots[prevMsgNum & PACKET_MASK].serverTime;
+	} else {
+		cl.oldServerTime = cl.snap.serverTime;
+		cl.oldFrameServerTime = cl.snap.serverTime;
+	}
+
+	cl.serverTime = cl.snap.serverTime;
 }
 
 
