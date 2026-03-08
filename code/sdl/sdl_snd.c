@@ -265,7 +265,7 @@ qboolean SNDDMA_Init( void )
 	desired.channels = s_sdlChannels->integer;
 	desired.callback = SNDDMA_AudioCallback;
 
-	sdlPlaybackDevice = SDL_OpenAudioDevice( NULL, SDL_FALSE, &desired, &obtained, SDL_AUDIO_ALLOW_ANY_CHANGE );
+	sdlPlaybackDevice = SDL_OpenAudioDevice( NULL, SDL_FALSE, &desired, &obtained, SDL_AUDIO_ALLOW_FREQUENCY_CHANGE | SDL_AUDIO_ALLOW_SAMPLES_CHANGE );
 	if ( sdlPlaybackDevice == 0 )
 	{
 		Com_Printf( "SDL_OpenAudioDevice() failed: %s\n", SDL_GetError() );
