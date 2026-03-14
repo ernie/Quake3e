@@ -2124,6 +2124,14 @@ static void CL_DownloadsComplete( void ) {
 	cls.cgameStarted = qtrue;
 	CL_InitCGame();
 
+	// TVD: Build second snapshot after CG_Init so cgame can read it.
+	// CL_TV_Open built snapshot 1 and read frame 2 into tvPlay.
+	// CG_Init set processedSnapshotNum = 1, so this snapshot (messageNum 2)
+	// is readable by CG_ProcessSnapshots.
+	if ( tvPlay.active ) {
+		CL_TV_BuildSnapshot();
+	}
+
 	if ( clc.demofile == FS_INVALID_HANDLE ) {
 		Cmd_AddCommand( "callvote", NULL );
 		Cmd_SetCommandCompletionFunc( "callvote", CL_CompleteCallvote );

@@ -513,18 +513,11 @@ qboolean CL_TV_Open( const char *filename ) {
 	// Build first snapshot into standard ring buffer
 	CL_TV_BuildSnapshot();
 
-	// Read second frame and build second snapshot
+	// Read second frame — data stays in tvPlay for post-init snapshot build
 	CL_TV_ReadFrame();
-	if ( tvPlay.atEnd ) {
-		// Only one frame - build duplicate snapshot with same data
-		CL_TV_BuildSnapshot();
-	} else {
-		CL_TV_BuildSnapshot();
-	}
 
 	tvPlay.active = qtrue;
 
-	// cl.snap and cl.newSnapshots are already set by CL_TV_BuildSnapshot()
 	// Set up command sequence for cgame init
 	clc.lastExecutedServerCommand = clc.serverCommandSequence;
 
