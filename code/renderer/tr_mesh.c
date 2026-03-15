@@ -288,8 +288,9 @@ void R_AddMD3Surfaces( trRefEntity_t *ent ) {
 	shader_t		*shader = NULL;
 	int				cull;
 	int				lod;
-	int				fogNum;
+	int				fogNum = 0;
 	qboolean		personalModel;
+	qboolean		shadowOnly = qfalse;
 #ifdef USE_PMLIGHT
 	dlight_t		*dl;
 	int				n;
@@ -335,7 +336,13 @@ void R_AddMD3Surfaces( trRefEntity_t *ent ) {
 	//
 	cull = R_CullModel( header, ent, bounds );
 	if ( cull == CULL_OUT ) {
-		return;
+		if ( r_shadows->integer != 2
+			|| personalModel
+			|| (ent->e.renderfx & ( RF_NOSHADOW | RF_DEPTHHACK | RF_FIRST_PERSON ))
+			|| R_CullLocalBoxExpanded( bounds, r_shadowDistance->value ) == CULL_OUT ) {
+			return;
+		}
+		shadowOnly = qtrue;
 	}
 
 	//
@@ -347,11 +354,11 @@ void R_AddMD3Surfaces( trRefEntity_t *ent ) {
 
 #ifdef USE_PMLIGHT
 	numDlights = 0;
-	if ( R_GetDlightMode() >= 2 && ( !personalModel || tr.viewParms.portalView != PV_NONE ) ) {
+	if ( !shadowOnly && R_GetDlightMode() >= 2 && ( !personalModel || tr.viewParms.portalView != PV_NONE ) ) {
 		R_TransformDlights( tr.viewParms.num_dlights, tr.viewParms.dlights, &tr.or );
 		for ( n = 0; n < tr.viewParms.num_dlights; n++ ) {
 			dl = &tr.viewParms.dlights[ n ];
-			if ( !R_LightCullBounds( dl, bounds[0], bounds[1] ) ) 
+			if ( !R_LightCullBounds( dl, bounds[0], bounds[1] ) )
 				dlights[ numDlights++ ] = dl;
 		}
 	}
@@ -360,7 +367,9 @@ void R_AddMD3Surfaces( trRefEntity_t *ent ) {
 	//
 	// see if we are in a fog volume
 	//
-	fogNum = R_ComputeFogNum( header, ent );
+	if ( !shadowOnly ) {
+		fogNum = R_ComputeFogNum( header, ent );
+	}
 
 	//
 	// draw all surfaces
@@ -420,12 +429,12 @@ void R_AddMD3Surfaces( trRefEntity_t *ent ) {
 		}
 
 		// don't add third_person objects if not viewing through a portal
-		if ( !personalModel ) {
+		if ( !personalModel && !shadowOnly ) {
 			R_AddDrawSurf( (void *)surface, shader, fogNum, 0 );
 		}
 
 #ifdef USE_PMLIGHT
-		if ( numDlights && shader->lightingStage >= 0 ) {
+		if ( !shadowOnly && numDlights && shader->lightingStage >= 0 ) {
 			for ( n = 0; n < numDlights; n++ ) {
 				dl = dlights[ n ];
 				tr.light = dl;

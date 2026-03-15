@@ -1297,6 +1297,7 @@ extern	cvar_t	*r_clear;						// force screen clear every frame
 
 extern	cvar_t	*r_shadows;						// controls shadows: 0 = none, 1 = blur, 2 = stencil, 3 = black planar projection
 extern	cvar_t	*r_shadowDistance;				// shadow volume extrusion distance in game units
+extern	cvar_t	*r_shadowClip;					// clip stencil shadows against BSP walls
 extern	cvar_t	*r_flares;						// light flares
 
 extern	cvar_t	*r_intensity;
@@ -1359,6 +1360,7 @@ void R_AddLitSurf( surfaceType_t *surface, shader_t *shader, int fogIndex );
 
 void R_LocalPointToWorld( const vec3_t local, vec3_t world );
 int R_CullLocalBox( const vec3_t bounds[2] );
+int R_CullLocalBoxExpanded( const vec3_t bounds[2], float expand );
 int R_CullPointAndRadius( const vec3_t origin, float radius );
 int R_CullLocalPointAndRadius( const vec3_t origin, float radius );
 int R_CullDlight( const dlight_t *dl );
@@ -1572,6 +1574,7 @@ WORLD MAP
 void R_AddBrushModelSurfaces( trRefEntity_t *e );
 void R_AddWorldSurfaces( void );
 qboolean R_inPVS( const vec3_t p1, const vec3_t p2 );
+mnode_t *R_PointInLeaf( const vec3_t p );
 
 
 /*

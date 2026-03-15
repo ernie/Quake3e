@@ -39,9 +39,14 @@ and Vulkan renderers:
   transparent effects draw on top of shadows as expected
 - **Entity stencil masking** — Entity pixels are marked in the stencil buffer so shadows
   don't darken the casting model itself
+- **Expanded entity culling** — Prevents shadows disappearing the moment the entity casting
+  them goes offscreen.
+- **BSP clipping** — Avoids most cases of wall/floor bleed, when a shadow is fully "caught"
+  by a surface, via per-vertex clipping to the BSP. You'll still see some bleeding and
+  artifacts if the shadow spills over a staircase or through a gap.
 
-To use: `cg_shadows 2`, `r_shadowDistance 128`, `cg_playerShadow 0`. Larger `r_shadowDistance`
-values cast farther but increase wall bleed.
+To use: `cg_shadows 2`, `r_shadowDistance 512`, `r_shadowClip 1`. The latter two values
+are the defaults.
 
 ### TV (TrinityVision, of course :wink:) Demo System
 

@@ -186,6 +186,7 @@ void R_MDRAddAnimSurfaces( trRefEntity_t *ent ) {
 	int				fogNum = 0;
 	int				cull;
 	qboolean	personalModel;
+	qboolean	shadowOnly = qfalse;
 
 	header = (mdrHeader_t *) tr.currentModel->modelData;
 
@@ -220,7 +221,27 @@ void R_MDRAddAnimSurfaces( trRefEntity_t *ent ) {
 	//
 	cull = R_MDRCullModel (header, ent);
 	if ( cull == CULL_OUT ) {
-		return;
+		if ( r_shadows->integer != 2
+			|| personalModel
+			|| (ent->e.renderfx & ( RF_NOSHADOW | RF_DEPTHHACK | RF_FIRST_PERSON )) ) {
+			return;
+		}
+		// expanded bounds for shadow cull
+		{
+			vec3_t shadowBounds[2];
+			int frameSize = (size_t)( &((mdrFrame_t *)0)->bones[ header->numBones ] );
+			mdrFrame_t *nf = (mdrFrame_t *)((byte *)header + header->ofsFrames + frameSize * ent->e.frame);
+			mdrFrame_t *of = (mdrFrame_t *)((byte *)header + header->ofsFrames + frameSize * ent->e.oldframe);
+			int k;
+			for (k = 0; k < 3; k++) {
+				shadowBounds[0][k] = of->bounds[0][k] < nf->bounds[0][k] ? of->bounds[0][k] : nf->bounds[0][k];
+				shadowBounds[1][k] = of->bounds[1][k] > nf->bounds[1][k] ? of->bounds[1][k] : nf->bounds[1][k];
+			}
+			if ( R_CullLocalBoxExpanded( shadowBounds, r_shadowDistance->value ) == CULL_OUT ) {
+				return;
+			}
+		}
+		shadowOnly = qtrue;
 	}
 
 	// figure out the current LOD of the model we're rendering, and set the lod pointer respectively.
@@ -244,7 +265,9 @@ void R_MDRAddAnimSurfaces( trRefEntity_t *ent ) {
 	}
 
 	// fogNum?
-	fogNum = R_MDRComputeFogNum( header, ent );
+	if ( !shadowOnly ) {
+		fogNum = R_MDRComputeFogNum( header, ent );
+	}
 
 	surface = (mdrSurface_t *)( (byte *)lod + lod->ofsSurfaces );
 
@@ -293,7 +316,7 @@ void R_MDRAddAnimSurfaces( trRefEntity_t *ent ) {
 			R_AddDrawSurf( (void *)surface, tr.projectionShadowShader, 0, 0 );
 		}
 
-		if (!personalModel)
+		if ( !personalModel && !shadowOnly )
 			R_AddDrawSurf( (void *)surface, shader, fogNum, 0 );
 
 		surface = (mdrSurface_t *)( (byte *)surface + surface->ofsEnd );
