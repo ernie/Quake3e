@@ -1298,6 +1298,8 @@ extern	cvar_t	*r_clear;						// force screen clear every frame
 extern	cvar_t	*r_shadows;						// controls shadows: 0 = none, 1 = blur, 2 = stencil, 3 = black planar projection
 extern	cvar_t	*r_shadowDistance;				// shadow volume extrusion distance in game units
 extern	cvar_t	*r_shadowClip;					// clip stencil shadows against BSP walls
+extern	cvar_t	*r_shadowClipPenetration;		// how far shadow back faces extend past a wall surface
+extern	cvar_t	*r_shadowClipExtension;			// max distance a shadow vertex can be extended to match neighbors
 extern	cvar_t	*r_flares;						// light flares
 
 extern	cvar_t	*r_intensity;

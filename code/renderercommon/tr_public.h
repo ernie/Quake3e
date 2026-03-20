@@ -179,6 +179,10 @@ typedef struct {
 
 	byte	*(*CM_ClusterPVS)(int cluster);
 
+	// collision trace for shadow clipping
+	void	(*CM_PointTrace)( trace_t *results, const vec3_t start, const vec3_t end,
+						int brushmask );
+
 	// visualization for debugging collision detection
 	void	(*CM_DrawDebugSurface)( void (*drawPoly)(int color, int numPoints, float *points) );
 
