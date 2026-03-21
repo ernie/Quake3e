@@ -93,6 +93,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 #endif
 
+#if defined( _M_ARM )
+#define ARCH_STRING "arm32"
+#define Q3_LITTLE_ENDIAN
+#undef arm32
+#define arm32 1
+#endif
+
 #else // !defined _WIN32
 
 // common unix platforms parameters
@@ -131,7 +138,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif // __arm64__
 
 #if defined (__PPC64__)
-#if defined (__LITTLE_ENDIAN__)
+#if defined (__LITTLE_ENDIAN__) || defined (__LITTLE_ENDIAN)
 #define ARCH_STRING "ppc64le"
 #define Q3_LITTLE_ENDIAN
 #else
